@@ -6,6 +6,7 @@ import { FlightPlanView } from "@/components/FlightPlanView";
 
 type SessionInfo = {
   navigraphConnected: boolean;
+  account: { id: string; email: string } | null;
   user: {
     name?: string;
     email?: string;
@@ -33,6 +34,10 @@ export function HomeApp() {
   const [toast, setToast] = useState<string | null>(null);
   const [pilotId, setPilotId] = useState("");
   const [username, setUsername] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingOfp, setLoadingOfp] = useState(false);
@@ -51,6 +56,8 @@ export function HomeApp() {
         return;
       }
       setSession(data);
+      if (data.account?.email) setAccountEmail(data.account.email);
+      else setAccountEmail("");
       if (data.simbrief?.userid) setPilotId(data.simbrief.userid);
       if (data.simbrief?.username) setUsername(data.simbrief.username);
     } catch {
@@ -75,6 +82,58 @@ export function HomeApp() {
     const t = window.setTimeout(() => setToast(null), 6000);
     return () => window.clearTimeout(t);
   }, [searchParams, loadSession, router]);
+
+  async function registerAccount() {
+    setAccountBusy(true);
+    setAccountError(null);
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: accountEmail.trim(),
+          password: accountPassword,
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setAccountError(data.error ?? "Could not create account");
+        return;
+      }
+      setAccountPassword("");
+      await loadSession();
+    } catch {
+      setAccountError("Network error.");
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function loginAccount() {
+    setAccountBusy(true);
+    setAccountError(null);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: accountEmail.trim(),
+          password: accountPassword,
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setAccountError(data.error ?? "Could not sign in");
+        return;
+      }
+      setAccountPassword("");
+      await loadSession();
+    } catch {
+      setAccountError("Network error.");
+    } finally {
+      setAccountBusy(false);
+    }
+  }
 
   async function saveSimbrief() {
     setSaving(true);
@@ -141,6 +200,8 @@ export function HomeApp() {
     session?.user?.preferred_username ||
     session?.user?.email;
 
+  const hasAccount = Boolean(session?.account);
+
   return (
     <div className="min-h-full bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(251,191,36,0.12),transparent)]">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
@@ -166,6 +227,74 @@ export function HomeApp() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,340px)_1fr] lg:items-start">
           <aside className="space-y-4 rounded-2xl border border-slate-700/80 bg-slate-900/50 p-5 backdrop-blur-sm">
             <h2 className="text-sm font-medium text-slate-300">Connections</h2>
+
+            <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                Account
+              </p>
+              {loadingSession ? (
+                <p className="mt-2 text-sm text-slate-500">Checking session…</p>
+              ) : hasAccount ? (
+                <div className="mt-2">
+                  <p className="text-sm text-emerald-400/90">Signed in</p>
+                  <p className="mt-1 font-mono text-sm text-slate-300">
+                    {session?.account?.email}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                    Run the MSFS bridge and sign in there with the same email and
+                    password. Your live position appears only for this session.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                    Create an account to save SimBrief on the server and to match
+                    your bridge position to this browser.
+                  </p>
+                  <label className="mt-3 block text-xs text-slate-500">
+                    Email
+                    <input
+                      type="email"
+                      value={accountEmail}
+                      onChange={(e) => setAccountEmail(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-500/60"
+                      autoComplete="email"
+                    />
+                  </label>
+                  <label className="mt-2 block text-xs text-slate-500">
+                    Password
+                    <input
+                      type="password"
+                      value={accountPassword}
+                      onChange={(e) => setAccountPassword(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-500/60"
+                      autoComplete="new-password"
+                    />
+                  </label>
+                  {accountError ? (
+                    <p className="mt-2 text-xs text-red-300">{accountError}</p>
+                  ) : null}
+                  <div className="mt-3 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      disabled={accountBusy}
+                      onClick={() => void registerAccount()}
+                      className="rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-amber-400 disabled:opacity-50"
+                    >
+                      {accountBusy ? "Please wait…" : "Create account"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={accountBusy}
+                      onClick={() => void loginAccount()}
+                      className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      Sign in
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
 
             {sessionError ? (
               <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
@@ -212,12 +341,20 @@ export function HomeApp() {
 
             <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-4">
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                SimBrief
+                SimBrief (dashboard)
               </p>
-              <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                Pilot ID or username loads your latest plan. ZFW CG appears when
-                SimBrief includes it (e.g. % MAC fields in weights).
-              </p>
+              {!hasAccount ? (
+                <p className="mt-2 text-xs leading-relaxed text-amber-200/70">
+                  Sign in to your account to save your SimBrief pilot ID or
+                  username on the server. You can still type an ID below and
+                  import without saving.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                  Pilot ID or username loads your latest plan. ZFW CG appears when
+                  SimBrief includes it (e.g. % MAC fields in weights).
+                </p>
+              )}
               <label className="mt-3 block text-xs text-slate-500">
                 Pilot ID
                 <input
@@ -248,9 +385,9 @@ export function HomeApp() {
               <div className="mt-3 flex flex-col gap-2">
                 <button
                   type="button"
-                  disabled={saving}
+                  disabled={saving || !hasAccount}
                   onClick={() => void saveSimbrief()}
-                  className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
+                  className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? "Saving…" : "Save SimBrief profile"}
                 </button>
@@ -296,7 +433,10 @@ export function HomeApp() {
                 </p>
               </div>
             ) : (
-              <FlightPlanView data={ofpData} />
+              <FlightPlanView
+                data={ofpData}
+                allowLiveMap={Boolean(session?.account)}
+              />
             )}
           </main>
         </div>

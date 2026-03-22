@@ -109,6 +109,61 @@ export function parseNavlog(ofp: unknown): NavlogRow[] {
   });
 }
 
+export type LatLng = { lat: number; lng: number };
+
+function coordFromRecord(r: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const k of keys) {
+    const n = pickNum(r, k);
+    if (n !== undefined && Number.isFinite(n)) return n;
+    const s = pickStr(r, k);
+    if (s) {
+      const v = Number.parseFloat(s);
+      if (Number.isFinite(v)) return v;
+    }
+  }
+  return undefined;
+}
+
+function parseCoordBlock(block: unknown): LatLng | null {
+  const r = asRecord(block);
+  if (!r) return null;
+  const latV = coordFromRecord(r, ["pos_lat", "latitude", "lat"]);
+  const lngV = coordFromRecord(r, ["pos_long", "pos_lon", "longitude", "lng", "lon"]);
+  if (
+    latV === undefined ||
+    lngV === undefined ||
+    !Number.isFinite(latV) ||
+    !Number.isFinite(lngV)
+  ) {
+    return null;
+  }
+  return { lat: latV, lng: lngV };
+}
+
+/** Ordered route points for maps: origin → nav fixes → destination. */
+export function parseRouteLatLngs(ofp: unknown): LatLng[] {
+  const pts: LatLng[] = [];
+  const push = (p: LatLng | null) => {
+    if (!p) return;
+    const last = pts[pts.length - 1];
+    if (
+      last &&
+      Math.abs(last.lat - p.lat) < 1e-7 &&
+      Math.abs(last.lng - p.lng) < 1e-7
+    ) {
+      return;
+    }
+    pts.push(p);
+  };
+  push(parseCoordBlock(child(ofp, "origin")));
+  const nav = asRecord(child(ofp, "navlog"));
+  for (const fix of asArray(nav?.fix)) {
+    push(parseCoordBlock(fix));
+  }
+  push(parseCoordBlock(child(ofp, "destination")));
+  return pts;
+}
+
 export type FuelLine = { label: string; value: string };
 
 /** Display suffixes derived from SimBrief `params.units` (weights & fuel). */

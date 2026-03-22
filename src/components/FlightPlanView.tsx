@@ -1,3 +1,4 @@
+import dynamic from "next/dynamic";
 import {
   formatElevationDisplay,
   formatNavAltitude,
@@ -10,6 +11,7 @@ import {
   parseGeneralSummary,
   parseNavlog,
   parseParams,
+  parseRouteLatLngs,
   parseTimes,
   parseTripTimeRows,
   parseUnitContext,
@@ -19,6 +21,12 @@ import {
   withDistanceNm,
   type AirportCard,
 } from "@/lib/ofp-parse";
+
+const FlightMap = dynamic(
+  () =>
+    import("@/components/FlightMap").then((m) => ({ default: m.FlightMap })),
+  { ssr: false },
+);
 
 function AirportPanel({
   title,
@@ -170,7 +178,14 @@ function DataList({
   );
 }
 
-export function FlightPlanView({ data }: { data: unknown }) {
+export function FlightPlanView({
+  data,
+  allowLiveMap,
+}: {
+  data: unknown;
+  /** Browser session only — enables live SSE for your user. */
+  allowLiveMap: boolean;
+}) {
   const d = data as { origin?: unknown; destination?: unknown };
   const origin = parseAirport(d.origin);
   const dest = parseAirport(d.destination);
@@ -187,6 +202,7 @@ export function FlightPlanView({ data }: { data: unknown }) {
   const links = parseExternalLinks(data);
   const zfwCg = parseZfwCgSummary(data);
   const tripTimeRows = parseTripTimeRows(data);
+  const routeLatLngs = parseRouteLatLngs(data);
 
   const titleParts = [origin.icao, dest.icao].filter(Boolean);
   const routeTitle =
@@ -297,6 +313,13 @@ export function FlightPlanView({ data }: { data: unknown }) {
           </p>
         )}
       </header>
+
+      <section>
+        <h3 className="mb-3 text-sm font-medium text-slate-400">
+          Route map
+        </h3>
+        <FlightMap route={routeLatLngs} showLivePosition={allowLiveMap} />
+      </section>
 
       <div className="grid gap-4 md:grid-cols-2">
         <AirportPanel title="Departure" a={origin} accent="from" />

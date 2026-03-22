@@ -1,4 +1,9 @@
 export type SessionData = {
+  /** Local email/password account (ezflpln). */
+  account?: {
+    id: string;
+    email: string;
+  };
   oauth?: {
     state: string;
     codeVerifier: string;

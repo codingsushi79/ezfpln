@@ -55,6 +55,7 @@ export async function GET() {
 
     return NextResponse.json({
       navigraphConnected,
+      account: session.account ?? null,
       user: user
         ? {
             name: user.name,
@@ -79,6 +80,13 @@ export async function PATCH(request: Request) {
     };
     const cookieStore = await cookies();
     const session = await getIronSession<SessionData>(cookieStore, getSessionOptions());
+
+    if (!session.account?.id) {
+      return NextResponse.json(
+        { error: "Create an account and sign in to save SimBrief settings." },
+        { status: 401 },
+      );
+    }
 
     const uid = body.simbriefUserid?.trim();
     const uname = body.simbriefUsername?.trim();
