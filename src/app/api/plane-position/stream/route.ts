@@ -45,9 +45,9 @@ export async function GET(request: Request) {
                 lat,
                 lng,
                 trackTrueDeg,
-                heading,
+                headingTrueDeg,
                 altitudeFt,
-                speedKt,
+                groundSpeedKt,
                 updatedAt,
               }) => ({
                 userId: uid,
@@ -55,9 +55,9 @@ export async function GET(request: Request) {
                 lng,
                 username: nameMap.get(uid) ?? null,
                 ...(trackTrueDeg !== undefined ? { trackTrueDeg } : {}),
-                ...(heading !== undefined ? { heading } : {}),
+                ...(headingTrueDeg !== undefined ? { headingTrueDeg } : {}),
                 ...(altitudeFt !== undefined ? { altitudeFt } : {}),
-                ...(speedKt !== undefined ? { speedKt } : {}),
+                ...(groundSpeedKt !== undefined ? { groundSpeedKt } : {}),
                 updatedAt,
               }),
             );

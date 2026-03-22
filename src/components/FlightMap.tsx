@@ -175,14 +175,14 @@ type PlaneOnMap = {
   lng: number;
   username?: string | null;
   trackTrueDeg?: number;
-  heading?: number;
+  headingTrueDeg?: number;
   altitudeFt?: number;
-  speedKt?: number;
+  groundSpeedKt?: number;
   updatedAt: number;
 };
 
 function mapRotationDeg(p: PlaneOnMap): number {
-  const d = p.trackTrueDeg ?? p.heading;
+  const d = p.trackTrueDeg ?? p.headingTrueDeg;
   return Number.isFinite(d) ? d! : 0;
 }
 
@@ -202,7 +202,7 @@ function MapViewController({
   myPlane: {
     lat: number;
     lng: number;
-    heading?: number;
+    headingTrueDeg?: number;
     trackTrueDeg?: number;
   } | null;
   planes: PlaneOnMap[];
@@ -255,7 +255,7 @@ function statsTooltipLines(p: PlaneOnMap) {
     <div className="space-y-0.5 font-mono leading-tight">
       <p>{fmtTrkOrHdg(rot, tt)}</p>
       <p>{fmtAlt(p.altitudeFt)}</p>
-      <p>{fmtGs(p.speedKt)}</p>
+      <p>{fmtGs(p.groundSpeedKt)}</p>
     </div>
   );
 }
@@ -283,7 +283,7 @@ export function FlightMap({
   const myPlane: {
     lat: number;
     lng: number;
-    heading?: number;
+    headingTrueDeg?: number;
     trackTrueDeg?: number;
   } | null = useMemo(() => {
     if (!accountId) return null;
@@ -292,7 +292,7 @@ export function FlightMap({
     return {
       lat: p.lat,
       lng: p.lng,
-      heading: p.heading,
+      headingTrueDeg: p.headingTrueDeg,
       trackTrueDeg: p.trackTrueDeg,
     };
   }, [planes, accountId]);
@@ -340,7 +340,7 @@ export function FlightMap({
         return selfPilotDivIcon(rot, fill, {
           hdg: fmtTrkOrHdg(rot, tt),
           alt: fmtAlt(p.altitudeFt),
-          spd: fmtGs(p.speedKt),
+          spd: fmtGs(p.groundSpeedKt),
         });
       }
       return otherPilotDivIcon(mapRotationDeg(p), fill, p.username);

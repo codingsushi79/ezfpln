@@ -1,20 +1,6 @@
-export type PlanePosition = {
-  lat: number;
-  lng: number;
-  /**
-   * True track over ground (° true): direction of motion. Optional; the MSFS
-   * bridge sends nose heading as `heading` unless a client sends track.
-   */
-  trackTrueDeg?: number;
-  /**
-   * Direction for map rotation when `trackTrueDeg` is absent (legacy bridges
-   * that sent nose heading only).
-   */
-  heading?: number;
-  /** Altitude / height MSL, feet. */
-  altitudeFt?: number;
-  /** Ground speed, knots. */
-  speedKt?: number;
+import type { PlanePositionSnapshot } from "@/lib/bridge-plane-report";
+
+export type PlanePosition = PlanePositionSnapshot & {
   updatedAt: number;
 };
 
@@ -22,9 +8,9 @@ const byUser = new Map<string, PlanePosition>();
 
 export function setPlanePosition(
   userId: string,
-  input: Omit<PlanePosition, "updatedAt">,
+  input: PlanePositionSnapshot,
 ): PlanePosition {
-  const p = { ...input, updatedAt: Date.now() };
+  const p: PlanePosition = { ...input, updatedAt: Date.now() };
   byUser.set(userId, p);
   return p;
 }
