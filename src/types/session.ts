@@ -3,6 +3,8 @@ export type SessionData = {
   account?: {
     id: string;
     email: string;
+    /** Map / multiplayer display name (unique). */
+    username?: string;
   };
   oauth?: {
     state: string;

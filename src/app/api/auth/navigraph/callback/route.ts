@@ -8,6 +8,9 @@ import {
   getNavigraphConfig,
 } from "@/lib/navigraph";
 import type { SessionData } from "@/types/session";
+import { updateUserNavigraph } from "@/lib/users-repo";
+
+export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
@@ -47,19 +50,32 @@ export async function GET(request: Request) {
     });
 
     session.oauth = undefined;
-    session.navigraph = {
-      refreshToken: tokens.refresh_token ?? "",
-    };
-
-    if (session.navigraph.refreshToken === "") {
+    const refresh = tokens.refresh_token ?? "";
+    if (refresh === "") {
       delete session.navigraph;
       await session.save();
       return NextResponse.redirect(`${home}?auth=no_refresh`);
     }
 
+    const accessExpiresAt =
+      Date.now() + (tokens.expires_in ?? 3600) * 1000;
+    session.navigraph = {
+      refreshToken: refresh,
+      accessToken: tokens.access_token,
+      accessExpiresAt,
+    };
+
     const user = await fetchNavigraphUserInfo(tokens.access_token);
     if (Object.keys(user).length > 0) {
       session.user = user;
+    }
+
+    if (session.account?.id) {
+      await updateUserNavigraph(session.account.id, {
+        refreshToken: refresh,
+        accessToken: tokens.access_token,
+        accessExpiresAt,
+      });
     }
 
     await session.save();

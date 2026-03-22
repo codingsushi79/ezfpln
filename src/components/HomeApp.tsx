@@ -6,7 +6,7 @@ import { FlightPlanView } from "@/components/FlightPlanView";
 
 type SessionInfo = {
   navigraphConnected: boolean;
-  account: { id: string; email: string } | null;
+  account: { id: string; email: string; username?: string | null } | null;
   user: {
     name?: string;
     email?: string;
@@ -36,6 +36,7 @@ export function HomeApp() {
   const [username, setUsername] = useState("");
   const [accountEmail, setAccountEmail] = useState("");
   const [accountPassword, setAccountPassword] = useState("");
+  const [signUpUsername, setSignUpUsername] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
@@ -99,6 +100,7 @@ export function HomeApp() {
         body: JSON.stringify({
           email: accountEmail.trim(),
           password: accountPassword,
+          username: signUpUsername.trim(),
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -107,6 +109,7 @@ export function HomeApp() {
         return;
       }
       setAccountPassword("");
+      setSignUpUsername("");
       await loadSession();
     } catch {
       setAccountError("Network error.");
@@ -246,6 +249,11 @@ export function HomeApp() {
                   <p className="font-mono text-sm text-slate-300">
                     {session?.account?.email}
                   </p>
+                  {session?.account?.username ? (
+                    <p className="text-sm text-violet-300/90">
+                      @{session.account.username}
+                    </p>
+                  ) : null}
                   <div className="rounded-lg border border-slate-700/80 bg-slate-950/50 p-3">
                     <p className="text-xs leading-relaxed text-slate-500">
                       Link the MSFS bridge: generate a 6-character code here, then
@@ -339,6 +347,16 @@ export function HomeApp() {
                       onChange={(e) => setAccountPassword(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-500/60"
                       autoComplete="new-password"
+                    />
+                  </label>
+                  <label className="mt-2 block text-xs text-slate-500">
+                    Username (map & multiplayer)
+                    <input
+                      value={signUpUsername}
+                      onChange={(e) => setSignUpUsername(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-100 outline-none focus:border-amber-500/60"
+                      placeholder="3–24: letters, numbers, _"
+                      autoComplete="username"
                     />
                   </label>
                   {accountError ? (

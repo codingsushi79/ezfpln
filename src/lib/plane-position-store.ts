@@ -3,6 +3,8 @@ export type PlanePosition = {
   lng: number;
   heading?: number;
   altitudeFt?: number;
+  /** Ground or indicated speed, knots (from sim / bridge). */
+  speedKt?: number;
   updatedAt: number;
 };
 

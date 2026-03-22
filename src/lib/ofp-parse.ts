@@ -164,6 +164,45 @@ export function parseRouteLatLngs(ofp: unknown): LatLng[] {
   return pts;
 }
 
+export type RouteWaypointMarker = { lat: number; lng: number; ident: string };
+
+/** Fixes with coordinates for map pins (origin, navlog fixes, destination). */
+export function parseRouteWaypointMarkers(ofp: unknown): RouteWaypointMarker[] {
+  const out: RouteWaypointMarker[] = [];
+  const push = (p: LatLng | null, ident: string) => {
+    if (!p || !ident.trim()) return;
+    const last = out[out.length - 1];
+    if (
+      last &&
+      Math.abs(last.lat - p.lat) < 1e-7 &&
+      Math.abs(last.lng - p.lng) < 1e-7
+    ) {
+      return;
+    }
+    out.push({ lat: p.lat, lng: p.lng, ident: ident.trim() });
+  };
+  const origin = asRecord(child(ofp, "origin")) ?? {};
+  push(
+    parseCoordBlock(child(ofp, "origin")),
+    pickStr(origin, "icao_code") ??
+      pickStr(origin, "icao") ??
+      "DEP",
+  );
+  const nav = asRecord(child(ofp, "navlog"));
+  for (const fix of asArray(nav?.fix)) {
+    const f = asRecord(fix) ?? {};
+    const ident =
+      pickStr(f, "ident") ?? pickStr(f, "name") ?? "·";
+    push(parseCoordBlock(fix), ident);
+  }
+  const dest = asRecord(child(ofp, "destination")) ?? {};
+  push(
+    parseCoordBlock(child(ofp, "destination")),
+    pickStr(dest, "icao_code") ?? pickStr(dest, "icao") ?? "ARR",
+  );
+  return out;
+}
+
 export type FuelLine = { label: string; value: string };
 
 /** Display suffixes derived from SimBrief `params.units` (weights & fuel). */

@@ -3,21 +3,25 @@ import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { DatabaseError } from "pg";
 import { getSessionOptions } from "@/lib/session";
-import { createUser } from "@/lib/users-repo";
+import { createUser, normalizeUsername } from "@/lib/users-repo";
 import type { SessionData } from "@/types/session";
 
 export const runtime = "nodejs";
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const usernameRe = /^[a-zA-Z0-9_]{3,24}$/;
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       email?: string;
       password?: string;
+      username?: string;
     };
     const email = body.email?.trim() ?? "";
     const password = body.password ?? "";
+    const rawUser = body.username?.trim() ?? "";
+    const pilotUsername = normalizeUsername(rawUser);
     if (!emailRe.test(email)) {
       return NextResponse.json(
         { error: "Enter a valid email address." },
@@ -30,13 +34,22 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    if (!usernameRe.test(pilotUsername)) {
+      return NextResponse.json(
+        {
+          error:
+            "Username must be 3–24 characters: letters, numbers, or underscore.",
+        },
+        { status: 400 },
+      );
+    }
     let user;
     try {
-      user = await createUser(email, password);
+      user = await createUser(email, password, pilotUsername);
     } catch (e) {
       if (e instanceof DatabaseError && e.code === "23505") {
         return NextResponse.json(
-          { error: "That email is already registered." },
+          { error: "That email or username is already taken." },
           { status: 409 },
         );
       }
@@ -47,11 +60,19 @@ export async function POST(request: Request) {
       cookieStore,
       getSessionOptions(),
     );
-    session.account = { id: user.id, email: user.email };
+    session.account = {
+      id: user.id,
+      email: user.email,
+      username: user.username ?? undefined,
+    };
     await session.save();
     return NextResponse.json({
       ok: true,
-      account: { id: user.id, email: user.email },
+      account: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+      },
     });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });

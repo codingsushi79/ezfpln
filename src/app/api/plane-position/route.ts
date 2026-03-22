@@ -62,11 +62,20 @@ export async function POST(request: Request) {
         : body.alt !== undefined
           ? Number(body.alt)
           : undefined;
+    const speedKtRaw =
+      body.speedKt !== undefined
+        ? Number(body.speedKt)
+        : body.gsKt !== undefined
+          ? Number(body.gsKt)
+          : body.groundSpeedKt !== undefined
+            ? Number(body.groundSpeedKt)
+            : undefined;
     const next: Omit<PlanePosition, "updatedAt"> = {
       lat,
       lng,
       ...(Number.isFinite(heading) ? { heading } : {}),
       ...(Number.isFinite(altitudeFt) ? { altitudeFt } : {}),
+      ...(Number.isFinite(speedKtRaw) ? { speedKt: speedKtRaw } : {}),
     };
     setPlanePosition(userId, next);
     return NextResponse.json({ ok: true }, { headers: cors });

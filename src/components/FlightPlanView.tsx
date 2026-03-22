@@ -12,6 +12,7 @@ import {
   parseNavlog,
   parseParams,
   parseRouteLatLngs,
+  parseRouteWaypointMarkers,
   parseTimes,
   parseTripTimeRows,
   parseUnitContext,
@@ -206,6 +207,7 @@ export function FlightPlanView({
   const zfwCg = parseZfwCgSummary(data);
   const tripTimeRows = parseTripTimeRows(data);
   const routeLatLngs = parseRouteLatLngs(data);
+  const routeWaypoints = parseRouteWaypointMarkers(data);
 
   const titleParts = [origin.icao, dest.icao].filter(Boolean);
   const routeTitle =
@@ -323,6 +325,7 @@ export function FlightPlanView({
         </h3>
         <FlightMap
           route={routeLatLngs}
+          waypoints={routeWaypoints}
           showLivePosition={allowLiveMap}
           accountId={accountId}
         />

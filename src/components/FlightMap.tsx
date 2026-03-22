@@ -2,22 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  CircleMarker,
   MapContainer,
   Marker,
   Polyline,
   TileLayer,
+  Tooltip,
   useMap,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { LatLng } from "@/lib/ofp-parse";
+import type { LatLng, RouteWaypointMarker } from "@/lib/ofp-parse";
 
 const MAP_MAX_ZOOM = 20;
 const TILE_MAX_NATIVE = 19;
 const FIT_MAX_ZOOM = 15;
 const FOLLOW_PAN_MS = 280;
 
-/** Your aircraft — vibrant purple (GPS-style marker). */
 const SELF_FILL = "#7c3aed";
 
 const OTHERS_PALETTE = [
@@ -31,6 +32,9 @@ const OTHERS_PALETTE = [
   "#2dd4bf",
 ];
 
+const tipClass =
+  "[&_.leaflet-tooltip]:!rounded-xl [&_.leaflet-tooltip]:!border [&_.leaflet-tooltip]:!border-slate-600 [&_.leaflet-tooltip]:!bg-slate-900 [&_.leaflet-tooltip]:!text-slate-100 [&_.leaflet-tooltip]:!px-2.5 [&_.leaflet-tooltip]:!py-1.5 [&_.leaflet-tooltip]:!text-xs [&_.leaflet-tooltip]:!shadow-lg";
+
 function fillForOtherUserId(userId: string): string {
   let h = 0;
   for (let i = 0; i < userId.length; i++) {
@@ -39,28 +43,91 @@ function fillForOtherUserId(userId: string): string {
   return OTHERS_PALETTE[h % OTHERS_PALETTE.length];
 }
 
-/**
- * Swallowtail chevron: one tip forward, base has an inverted-V notch; thick white
- * rim; short amber “heading” stem from the nose (rotates with aircraft).
- */
-function swallowtailNavIcon(headingDeg: number, fillHex: string) {
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function fmtHdg(deg: number | undefined): string {
+  if (deg === undefined || !Number.isFinite(deg)) return "HDG —";
+  const v = Math.round(((deg % 360) + 360) % 360);
+  return `HDG ${String(v).padStart(3, "0")}°`;
+}
+
+function fmtAlt(ft: number | undefined): string {
+  if (ft === undefined || !Number.isFinite(ft)) return "ALT —";
+  if (ft >= 17900) return `FL${Math.round(ft / 100)}`;
+  return `${Math.round(ft)} ft`;
+}
+
+function fmtSpd(kt: number | undefined): string {
+  if (kt === undefined || !Number.isFinite(kt)) return "— kts";
+  return `${Math.round(kt)} kts`;
+}
+
+function chevronSvgPath(fillHex: string): string {
+  return `<svg width="40" height="52" viewBox="0 0 40 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M20 6 L34 24 Q35.2 26.2 33.2 28 L22 42 Q20 44.5 18 42 L6.8 28 Q4.8 26.2 6 24 L20 6 Z"
+          fill="${fillHex}" stroke="#ffffff" stroke-width="2.9" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>`;
+}
+
+/** You: chevron rotates; rounded stats box stays upright to the right. */
+function selfPilotDivIcon(
+  headingDeg: number,
+  fillHex: string,
+  lines: { hdg: string; alt: string; spd: string },
+) {
   const h = Number.isFinite(headingDeg) ? headingDeg : 0;
-  const w = 40;
-  const hgt = 58;
-  const cx = 20;
-  const notchY = 50;
-  const noseY = 14;
+  const W = 130;
+  const H = 54;
+  const ax = 20;
+  const ay = 48;
+  const box = `${escapeHtml(lines.hdg)}<br>${escapeHtml(lines.alt)}<br>${escapeHtml(lines.spd)}`;
   return L.divIcon({
     className: "plane-live-marker leaflet-zoom-animated",
-    html: `<div style="transform:rotate(${h}deg);transform-origin:${cx}px ${notchY}px;width:${w}px;height:${hgt}px;display:flex;align-items:center;justify-content:center;pointer-events:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))">
-      <svg width="${w}" height="${hgt}" viewBox="0 0 40 58" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M${cx} ${noseY} L5 38 L${cx} ${notchY} L35 38 Z"
-          fill="${fillHex}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-        <line x1="${cx}" y1="${noseY}" x2="${cx}" y2="2.5" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round"/>
-      </svg>
+    html: `<div style="position:relative;width:${W}px;height:${H}px;pointer-events:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))">
+      <div style="position:absolute;left:0;bottom:0;width:40px;height:52px;transform:rotate(${h}deg);transform-origin:${ax}px ${ay}px">
+        ${chevronSvgPath(fillHex)}
+      </div>
+      <div style="position:absolute;left:46px;top:4px;min-width:72px;max-width:88px;border-radius:10px;border:1px solid rgba(148,163,184,0.45);background:rgba(15,23,42,0.95);padding:5px 8px;font:600 10px/1.35 ui-monospace,SFMono-Regular,monospace;color:#e2e8f0;text-align:left">
+        ${box}
+      </div>
     </div>`,
-    iconSize: [w, hgt],
-    iconAnchor: [cx, notchY],
+    iconSize: [W, H],
+    iconAnchor: [ax, ay],
+  });
+}
+
+/** Others: @username fixed above icon; chevron rotates beneath. */
+function otherPilotDivIcon(
+  headingDeg: number,
+  fillHex: string,
+  username: string | null | undefined,
+) {
+  const h = Number.isFinite(headingDeg) ? headingDeg : 0;
+  const W = 96;
+  const H = 70;
+  const ax = 48;
+  const ay = 64;
+  const label = username?.trim()
+    ? `@${escapeHtml(username.trim())}`
+    : "Pilot";
+  return L.divIcon({
+    className: "plane-live-marker leaflet-zoom-animated",
+    html: `<div style="position:relative;width:${W}px;height:${H}px;pointer-events:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.45))">
+      <div style="position:absolute;left:0;right:0;top:0;text-align:center;font:700 11px/1.2 system-ui,sans-serif;color:#ede9fe;text-shadow:0 1px 4px rgba(0,0,0,0.85);padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${W}px">
+        ${label}
+      </div>
+      <div style="position:absolute;left:50%;bottom:0;margin-left:-20px;width:40px;height:52px;transform:rotate(${h}deg);transform-origin:20px 46px">
+        ${chevronSvgPath(fillHex)}
+      </div>
+    </div>`,
+    iconSize: [W, H],
+    iconAnchor: [ax, ay],
   });
 }
 
@@ -68,7 +135,10 @@ type PlaneOnMap = {
   userId: string;
   lat: number;
   lng: number;
+  username?: string | null;
   heading?: number;
+  altitudeFt?: number;
+  speedKt?: number;
   updatedAt: number;
 };
 
@@ -123,16 +193,28 @@ function MapViewController({
   return null;
 }
 
+function statsTooltipLines(p: PlaneOnMap) {
+  return (
+    <div className="space-y-0.5 font-mono leading-tight">
+      <p>{fmtHdg(p.heading)}</p>
+      <p>{fmtAlt(p.altitudeFt)}</p>
+      <p>{fmtSpd(p.speedKt)}</p>
+    </div>
+  );
+}
+
 export function FlightMap({
   route,
+  waypoints,
   showLivePosition,
   accountId,
 }: {
   route: LatLng[];
+  waypoints?: RouteWaypointMarker[];
   showLivePosition: boolean;
-  /** Session account id — used to style “you” vs other pilots. */
   accountId?: string | null;
 }) {
+  const wp = waypoints ?? [];
   const positions = useMemo(
     () => route.map((p) => [p.lat, p.lng] as [number, number]),
     [route],
@@ -185,11 +267,21 @@ export function FlightMap({
     setFollowLive((v) => !v);
   }, [showLivePosition]);
 
-  const iconForPlane = useCallback((p: PlaneOnMap) => {
-    const isSelf = Boolean(accountId && p.userId === accountId);
-    const fill = isSelf ? SELF_FILL : fillForOtherUserId(p.userId);
-    return swallowtailNavIcon(p.heading ?? 0, fill);
-  }, [accountId]);
+  const iconForPlane = useCallback(
+    (p: PlaneOnMap) => {
+      const isSelf = Boolean(accountId && p.userId === accountId);
+      const fill = isSelf ? SELF_FILL : fillForOtherUserId(p.userId);
+      if (isSelf) {
+        return selfPilotDivIcon(p.heading ?? 0, fill, {
+          hdg: fmtHdg(p.heading),
+          alt: fmtAlt(p.altitudeFt),
+          spd: fmtSpd(p.speedKt),
+        });
+      }
+      return otherPilotDivIcon(p.heading ?? 0, fill, p.username);
+    },
+    [accountId],
+  );
 
   const hasTraffic = planes.length > 0;
   const myPos: [number, number] | null = myPlane
@@ -220,14 +312,15 @@ export function FlightMap({
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-700/80 ring-1 ring-slate-600/30">
       <p className="border-b border-slate-700/80 bg-slate-900/60 px-4 py-2 text-xs text-slate-500">
-        Route = amber line.{" "}
-        <span className="text-violet-300/90">Purple chevron</span> = you; other
-        colors = same shape for other pilots.
+        Amber line = route; rings = waypoints.{" "}
+        <span className="text-violet-300/90">You</span> = purple chevron + stats
+        box; <span className="text-slate-400">others</span> show @name above;
+        hover them for HDG / ALT / speed.
         {myPos ? (
           <>
             {" "}
             <span className="text-slate-400">
-              Click <span className="text-violet-300/90">your</span> icon to{" "}
+              Click <span className="text-violet-300/90">your</span> chevron to{" "}
               {followActive ? (
                 <button
                   type="button"
@@ -258,7 +351,7 @@ export function FlightMap({
         minZoom={2}
         zoomAnimation
         fadeAnimation
-        className="h-[min(52vh,480px)] w-full z-0 [&_.leaflet-control-zoom]:border-slate-600 [&_.leaflet-control-zoom]:bg-slate-900/90 [&_.leaflet-control-zoom_a]:text-slate-200"
+        className={`h-[min(52vh,480px)] w-full z-0 [&_.leaflet-control-zoom]:border-slate-600 [&_.leaflet-control-zoom]:bg-slate-900/90 [&_.leaflet-control-zoom_a]:text-slate-200 ${tipClass}`}
         scrollWheelZoom
         wheelPxPerZoomLevel={96}
         zoomSnap={0.25}
@@ -280,21 +373,50 @@ export function FlightMap({
             }}
           />
         ) : null}
-        {planes.map((p) => (
-          <Marker
-            key={p.userId}
-            position={[p.lat, p.lng]}
-            icon={iconForPlane(p)}
-            zIndexOffset={
-              accountId && p.userId === accountId ? 1000 : 500
-            }
-            eventHandlers={
-              accountId && p.userId === accountId
-                ? { click: onSelfMarkerClick }
-                : {}
-            }
-          />
+        {wp.map((w, i) => (
+          <CircleMarker
+            key={`${w.ident}-${i}-${w.lat}-${w.lng}`}
+            center={[w.lat, w.lng]}
+            radius={5}
+            pathOptions={{
+              color: "#fbbf24",
+              fillColor: "#0f172a",
+              fillOpacity: 0.92,
+              weight: 2,
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -6]} opacity={1}>
+              <span className="font-mono text-[11px] text-slate-100">
+                {w.ident}
+              </span>
+            </Tooltip>
+          </CircleMarker>
         ))}
+        {planes.map((p) => {
+          const isSelf = Boolean(accountId && p.userId === accountId);
+          return (
+            <Marker
+              key={p.userId}
+              position={[p.lat, p.lng]}
+              icon={iconForPlane(p)}
+              zIndexOffset={isSelf ? 1000 : 500}
+              eventHandlers={
+                isSelf ? { click: onSelfMarkerClick } : {}
+              }
+            >
+              {!isSelf ? (
+                <Tooltip
+                  direction="right"
+                  offset={[10, -18]}
+                  opacity={1}
+                  sticky
+                >
+                  {statsTooltipLines(p)}
+                </Tooltip>
+              ) : null}
+            </Marker>
+          );
+        })}
         <MapViewController
           positions={positions}
           myPlane={myPlane}

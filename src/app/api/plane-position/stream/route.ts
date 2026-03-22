@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { getSessionOptions } from "@/lib/session";
 import { getAllPlanePositions } from "@/lib/plane-position-store";
+import { getUsernamesByIds } from "@/lib/users-repo";
 import type { SessionData } from "@/types/session";
 
 export const dynamic = "force-dynamic";
@@ -34,19 +35,39 @@ export async function GET(request: Request) {
   const stream = new ReadableStream({
     start(controller) {
       const send = () => {
-        const planes = getAllPlanePositions().map(
-          ({ userId, lat, lng, heading, altitudeFt, updatedAt }) => ({
-            userId,
-            lat,
-            lng,
-            ...(heading !== undefined ? { heading } : {}),
-            ...(altitudeFt !== undefined ? { altitudeFt } : {}),
-            updatedAt,
-          }),
-        );
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ planes })}\n\n`),
-        );
+        void (async () => {
+          try {
+            const list = getAllPlanePositions();
+            const nameMap = await getUsernamesByIds(list.map((p) => p.userId));
+            const planes = list.map(
+              ({
+                userId: uid,
+                lat,
+                lng,
+                heading,
+                altitudeFt,
+                speedKt,
+                updatedAt,
+              }) => ({
+                userId: uid,
+                lat,
+                lng,
+                username: nameMap.get(uid) ?? null,
+                ...(heading !== undefined ? { heading } : {}),
+                ...(altitudeFt !== undefined ? { altitudeFt } : {}),
+                ...(speedKt !== undefined ? { speedKt } : {}),
+                updatedAt,
+              }),
+            );
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ planes })}\n\n`),
+            );
+          } catch {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ planes: [] })}\n\n`),
+            );
+          }
+        })();
       };
       send();
       const id = setInterval(send, 800);

@@ -47,6 +47,19 @@ async function ensureSchema(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS idx_bridge_pairing_user ON bridge_pairing_codes(user_id);
       `);
+      await p.query(`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS simbrief_userid TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS simbrief_username TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS navigraph_refresh_token TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS navigraph_access_token TEXT;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS navigraph_access_expires_at BIGINT;
+      `);
+      await p.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower
+        ON users (lower(username))
+        WHERE username IS NOT NULL AND length(trim(username)) > 0;
+      `);
     })();
   }
   await schemaPromise;

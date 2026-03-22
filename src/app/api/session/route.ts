@@ -7,7 +7,17 @@ import {
   getNavigraphConfig,
   refreshAccessToken,
 } from "@/lib/navigraph";
+import {
+  persistNavigraphFromSession,
+  syncIntegrationsForAccount,
+} from "@/lib/session-integrations";
+import {
+  updateUserNavigraph,
+  updateUserSimbrief,
+} from "@/lib/users-repo";
 import type { SessionData } from "@/types/session";
+
+export const runtime = "nodejs";
 
 async function ensureFreshAccess(session: SessionData): Promise<void> {
   const ng = session.navigraph;
@@ -28,9 +38,13 @@ async function ensureFreshAccess(session: SessionData): Promise<void> {
     ng.accessToken = t.access_token;
     if (t.refresh_token) ng.refreshToken = t.refresh_token;
     ng.accessExpiresAt = Date.now() + (t.expires_in ?? 3600) * 1000;
+    await persistNavigraphFromSession(session);
   } catch {
     session.navigraph = undefined;
     session.user = undefined;
+    if (session.account?.id) {
+      await updateUserNavigraph(session.account.id, null);
+    }
   }
 }
 
@@ -38,7 +52,10 @@ export async function GET() {
   try {
     const cookieStore = await cookies();
     const session = await getIronSession<SessionData>(cookieStore, getSessionOptions());
+    await syncIntegrationsForAccount(session);
+    await session.save();
     await ensureFreshAccess(session);
+    await persistNavigraphFromSession(session);
     if (session.navigraph) await session.save();
 
     const navigraphConnected = Boolean(session.navigraph?.refreshToken);
@@ -55,7 +72,13 @@ export async function GET() {
 
     return NextResponse.json({
       navigraphConnected,
-      account: session.account ?? null,
+      account: session.account
+        ? {
+            id: session.account.id,
+            email: session.account.email,
+            username: session.account.username ?? null,
+          }
+        : null,
       user: user
         ? {
             name: user.name,
@@ -97,6 +120,7 @@ export async function PATCH(request: Request) {
     } else {
       session.simbrief = undefined;
     }
+    await updateUserSimbrief(session.account.id, session.simbrief ?? null);
     await session.save();
     return NextResponse.json({ ok: true, simbrief: session.simbrief ?? null });
   } catch {
