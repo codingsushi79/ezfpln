@@ -17,8 +17,8 @@ const TILE_MAX_NATIVE = 19;
 const FIT_MAX_ZOOM = 15;
 const FOLLOW_PAN_MS = 280;
 
-/** Your aircraft — purple, matches in-app nav style. */
-const SELF_FILL = "#7c68f0";
+/** Your aircraft — vibrant purple (GPS-style marker). */
+const SELF_FILL = "#7c3aed";
 
 const OTHERS_PALETTE = [
   "#f97316",
@@ -40,25 +40,27 @@ function fillForOtherUserId(userId: string): string {
 }
 
 /**
- * Sleek delta / paper-plane silhouette: sharp nose, flared wings, concave rear,
- * thick white outline (Google Maps–style).
+ * Swallowtail chevron: one tip forward, base has an inverted-V notch; thick white
+ * rim; short amber “heading” stem from the nose (rotates with aircraft).
  */
-function deltaPlaneIcon(headingDeg: number, fillHex: string) {
+function swallowtailNavIcon(headingDeg: number, fillHex: string) {
   const h = Number.isFinite(headingDeg) ? headingDeg : 0;
-  const w = 44;
-  const hgt = 52;
-  const ax = w / 2;
-  const ay = hgt / 2 + 3;
+  const w = 40;
+  const hgt = 58;
+  const cx = 20;
+  const notchY = 50;
+  const noseY = 14;
   return L.divIcon({
     className: "plane-live-marker leaflet-zoom-animated",
-    html: `<div style="transform:rotate(${h}deg);transform-origin:${ax}px ${ay}px;width:${w}px;height:${hgt}px;display:flex;align-items:center;justify-content:center;pointer-events:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))">
-      <svg width="${w}" height="${hgt}" viewBox="0 0 44 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M22 4 L40 27 Q36 31 30 29 L22 46 Q14 31 8 27 L4 27 Q10 18 22 4 Z"
-          fill="${fillHex}" stroke="#ffffff" stroke-width="2.85" stroke-linejoin="round" stroke-linecap="round"/>
+    html: `<div style="transform:rotate(${h}deg);transform-origin:${cx}px ${notchY}px;width:${w}px;height:${hgt}px;display:flex;align-items:center;justify-content:center;pointer-events:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))">
+      <svg width="${w}" height="${hgt}" viewBox="0 0 40 58" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M${cx} ${noseY} L5 38 L${cx} ${notchY} L35 38 Z"
+          fill="${fillHex}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+        <line x1="${cx}" y1="${noseY}" x2="${cx}" y2="2.5" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round"/>
       </svg>
     </div>`,
     iconSize: [w, hgt],
-    iconAnchor: [ax, ay],
+    iconAnchor: [cx, notchY],
   });
 }
 
@@ -186,7 +188,7 @@ export function FlightMap({
   const iconForPlane = useCallback((p: PlaneOnMap) => {
     const isSelf = Boolean(accountId && p.userId === accountId);
     const fill = isSelf ? SELF_FILL : fillForOtherUserId(p.userId);
-    return deltaPlaneIcon(p.heading ?? 0, fill);
+    return swallowtailNavIcon(p.heading ?? 0, fill);
   }, [accountId]);
 
   const hasTraffic = planes.length > 0;
@@ -219,8 +221,8 @@ export function FlightMap({
     <div className="overflow-hidden rounded-2xl border border-slate-700/80 ring-1 ring-slate-600/30">
       <p className="border-b border-slate-700/80 bg-slate-900/60 px-4 py-2 text-xs text-slate-500">
         Route = amber line.{" "}
-        <span className="text-violet-300/90">Purple delta</span> = you; other
-        colors = other pilots online.
+        <span className="text-violet-300/90">Purple chevron</span> = you; other
+        colors = same shape for other pilots.
         {myPos ? (
           <>
             {" "}
