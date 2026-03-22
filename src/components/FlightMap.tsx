@@ -122,14 +122,14 @@ export function FlightMap({
         {!showLivePosition ? (
           <>
             {" "}
-            Sign in to your account and run the MSFS bridge while signed in here
-            to see your live aircraft on the map.
+            Sign in here, generate a bridge code on the site, and enter it in the
+            MSFS bridge to see your live aircraft on the map.
           </>
         ) : (
           <>
             {" "}
-            Live position from the MSFS bridge appears when you sign in through
-            the bridge with the same account.
+            Live position appears after you link the bridge with a code from this
+            site.
           </>
         )}
       </div>
@@ -144,7 +144,7 @@ export function FlightMap({
     <div className="overflow-hidden rounded-2xl border border-slate-700/80 ring-1 ring-slate-600/30">
       <p className="border-b border-slate-700/80 bg-slate-900/60 px-4 py-2 text-xs text-slate-500">
         Route polyline from SimBrief; amber = plan. Cyan marker = your live
-        aircraft (MSFS bridge + same account).
+        aircraft (MSFS bridge linked with a site code).
         {!showLivePosition ? (
           <span className="ml-1 text-amber-200/80">
             Sign in to see your position.

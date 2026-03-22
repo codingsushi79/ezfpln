@@ -39,6 +39,14 @@ async function ensureSchema(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS idx_bridge_tokens_user ON bridge_tokens(user_id);
       `);
+      await p.query(`
+        CREATE TABLE IF NOT EXISTS bridge_pairing_codes (
+          code TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          expires_at BIGINT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_bridge_pairing_user ON bridge_pairing_codes(user_id);
+      `);
     })();
   }
   await schemaPromise;

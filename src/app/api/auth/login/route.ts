@@ -4,7 +4,6 @@ import { getIronSession } from "iron-session";
 import { getSessionOptions } from "@/lib/session";
 import { getUserByEmail } from "@/lib/users-repo";
 import { verifyPassword } from "@/lib/password";
-import { mintBridgeTokenForUser } from "@/lib/bridge-auth";
 import type { SessionData } from "@/types/session";
 
 export const runtime = "nodejs";
@@ -14,7 +13,6 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       email?: string;
       password?: string;
-      client?: string;
     };
     const email = body.email?.trim() ?? "";
     const password = body.password ?? "";
@@ -24,14 +22,6 @@ export async function POST(request: Request) {
         { error: "Invalid email or password." },
         { status: 401 },
       );
-    }
-    if (body.client === "bridge") {
-      const token = await mintBridgeTokenForUser(user.id);
-      return NextResponse.json({
-        ok: true,
-        token,
-        email: user.email,
-      });
     }
     const cookieStore = await cookies();
     const session = await getIronSession<SessionData>(

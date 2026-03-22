@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Sign in on the web or send Authorization: Bearer <bridge token>.",
+          "Sign in on the web or send Authorization: Bearer <bridge token> (link the bridge with a site pairing code).",
       },
       { status: 401, headers: cors },
     );
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Sign in on the web or send Authorization: Bearer <bridge token>.",
+            "Sign in on the web or send Authorization: Bearer <bridge token> (link the bridge with a site pairing code).",
         },
         { status: 401, headers: cors },
       );

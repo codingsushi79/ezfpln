@@ -43,6 +43,12 @@ export function HomeApp() {
   const [loadingOfp, setLoadingOfp] = useState(false);
   const [ofpError, setOfpError] = useState<string | null>(null);
   const [ofpData, setOfpData] = useState<unknown | null>(null);
+  const [bridgeCode, setBridgeCode] = useState<string | null>(null);
+  const [bridgeCodeExpiresAt, setBridgeCodeExpiresAt] = useState<number | null>(
+    null,
+  );
+  const [bridgeCodeBusy, setBridgeCodeBusy] = useState(false);
+  const [bridgeCodeError, setBridgeCodeError] = useState<string | null>(null);
 
   const loadSession = useCallback(async () => {
     setLoadingSession(true);
@@ -235,15 +241,79 @@ export function HomeApp() {
               {loadingSession ? (
                 <p className="mt-2 text-sm text-slate-500">Checking session…</p>
               ) : hasAccount ? (
-                <div className="mt-2">
+                <div className="mt-2 space-y-3">
                   <p className="text-sm text-emerald-400/90">Signed in</p>
-                  <p className="mt-1 font-mono text-sm text-slate-300">
+                  <p className="font-mono text-sm text-slate-300">
                     {session?.account?.email}
                   </p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                    Run the MSFS bridge and sign in there with the same email and
-                    password. Your live position appears only for this session.
-                  </p>
+                  <div className="rounded-lg border border-slate-700/80 bg-slate-950/50 p-3">
+                    <p className="text-xs leading-relaxed text-slate-500">
+                      Link the MSFS bridge: generate a 6-character code here, then
+                      enter it in the bridge app. Codes expire in 10 minutes and
+                      can be used once.
+                    </p>
+                    {bridgeCodeError ? (
+                      <p className="mt-2 text-xs text-red-300">{bridgeCodeError}</p>
+                    ) : null}
+                    {bridgeCode ? (
+                      <div className="mt-3">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
+                          Bridge code
+                        </p>
+                        <p className="mt-1 select-all font-mono text-2xl font-semibold tracking-[0.2em] text-amber-300">
+                          {bridgeCode}
+                        </p>
+                        {bridgeCodeExpiresAt ? (
+                          <p className="mt-2 text-xs text-slate-500">
+                            Expires{" "}
+                            {new Date(bridgeCodeExpiresAt).toLocaleString()}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={bridgeCodeBusy}
+                      onClick={async () => {
+                        setBridgeCodeBusy(true);
+                        setBridgeCodeError(null);
+                        try {
+                          const res = await fetch("/api/bridge/pairing-code", {
+                            method: "POST",
+                            credentials: "include",
+                          });
+                          const data = (await res.json()) as {
+                            error?: string;
+                            code?: string;
+                            expiresAt?: number;
+                          };
+                          if (!res.ok) {
+                            setBridgeCodeError(
+                              data.error ?? "Could not create code",
+                            );
+                            setBridgeCode(null);
+                            setBridgeCodeExpiresAt(null);
+                            return;
+                          }
+                          setBridgeCode(data.code ?? null);
+                          setBridgeCodeExpiresAt(data.expiresAt ?? null);
+                        } catch {
+                          setBridgeCodeError("Network error.");
+                          setBridgeCode(null);
+                          setBridgeCodeExpiresAt(null);
+                        } finally {
+                          setBridgeCodeBusy(false);
+                        }
+                      }}
+                      className="mt-3 w-full rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      {bridgeCodeBusy
+                        ? "Generating…"
+                        : bridgeCode
+                          ? "New code"
+                          : "Generate bridge code"}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <>
