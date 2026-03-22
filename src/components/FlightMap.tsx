@@ -75,27 +75,31 @@ function fmtGs(kt: number | undefined): string {
   return `GS ${Math.round(kt)} kts`;
 }
 
+/** Pixel size of the rotating SVG (square viewBox). */
+const PILOT_MARKER_PX = 48;
+/** Center of viewBox — map anchor + rotation pivot (symmetric shape). */
+const PILOT_MARKER_C = PILOT_MARKER_PX / 2;
+
 /**
- * Four-sided diamond (rhombus): tip points along track; rotation anchor at
- * bottom vertex (20, 44) in viewBox coords.
+ * Sleek symmetric heading diamond: top vertex = track direction; fill is the
+ * only color token (recolor via `fillHex`). Center (24,24) = map position.
  */
-function chevronSvgPath(fillHex: string): string {
+function pilotMarkerSvg(fillHex: string): string {
   const stroke = "#ffffff";
-  const w = 3.2;
-  return `<svg width="40" height="48" viewBox="0 0 40 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  const sw = 2.35;
+  return `<svg width="${PILOT_MARKER_PX}" height="${PILOT_MARKER_PX}" viewBox="0 0 ${PILOT_MARKER_PX} ${PILOT_MARKER_PX}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path
-          d="M 20 4 L 36 24 L 20 44 L 4 24 Z"
+          d="M 24 5.5 L 40.5 24 L 24 42.5 L 7.5 24 Z"
           fill="${fillHex}"
           stroke="${stroke}"
-          stroke-width="${w}"
+          stroke-width="${sw}"
           stroke-linejoin="round"
           stroke-linecap="round"
-          vector-effect="non-scaling-stroke"
         />
       </svg>`;
 }
 
-/** You: diamond rotates; rounded stats box stays upright to the right. */
+/** You: marker rotates; rounded stats box stays upright to the right. */
 function selfPilotDivIcon(
   headingDeg: number,
   fillHex: string,
@@ -104,18 +108,18 @@ function selfPilotDivIcon(
   const h = Number.isFinite(headingDeg) ? headingDeg : 0;
   const W = 130;
   const H = 54;
-  const ox = 20;
-  const oy = 44;
-  const anchorX = 20;
-  const anchorY = H - 48 + oy;
+  const ox = PILOT_MARKER_C;
+  const oy = PILOT_MARKER_C;
+  const anchorX = PILOT_MARKER_C;
+  const anchorY = H - PILOT_MARKER_PX + PILOT_MARKER_C;
   const box = `${escapeHtml(lines.hdg)}<br>${escapeHtml(lines.alt)}<br>${escapeHtml(lines.spd)}`;
   return L.divIcon({
     className: "plane-live-marker leaflet-zoom-animated",
     html: `<div style="position:relative;width:${W}px;height:${H}px;pointer-events:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))">
-      <div style="position:absolute;left:0;bottom:0;width:40px;height:48px;transform:rotate(${h}deg);transform-origin:${ox}px ${oy}px">
-        ${chevronSvgPath(fillHex)}
+      <div style="position:absolute;left:0;bottom:0;width:${PILOT_MARKER_PX}px;height:${PILOT_MARKER_PX}px;transform:rotate(${h}deg);transform-origin:${ox}px ${oy}px">
+        ${pilotMarkerSvg(fillHex)}
       </div>
-      <div style="position:absolute;left:46px;top:4px;min-width:72px;max-width:88px;border-radius:10px;border:1px solid rgba(148,163,184,0.45);background:rgba(15,23,42,0.95);padding:5px 8px;font:600 10px/1.35 ui-monospace,SFMono-Regular,monospace;color:#e2e8f0;text-align:left">
+      <div style="position:absolute;left:54px;top:4px;min-width:72px;max-width:88px;border-radius:10px;border:1px solid rgba(148,163,184,0.45);background:rgba(15,23,42,0.95);padding:5px 8px;font:600 10px/1.35 ui-monospace,SFMono-Regular,monospace;color:#e2e8f0;text-align:left">
         ${box}
       </div>
     </div>`,
@@ -124,7 +128,7 @@ function selfPilotDivIcon(
   });
 }
 
-/** Others: @username fixed above icon; diamond rotates beneath. */
+/** Others: @username fixed above icon; marker rotates beneath. */
 function otherPilotDivIcon(
   headingDeg: number,
   fillHex: string,
@@ -133,10 +137,11 @@ function otherPilotDivIcon(
   const h = Number.isFinite(headingDeg) ? headingDeg : 0;
   const W = 96;
   const H = 68;
-  const ox = 20;
-  const oy = 44;
+  const ox = PILOT_MARKER_C;
+  const oy = PILOT_MARKER_C;
   const anchorX = W / 2;
-  const anchorY = H - 48 + oy;
+  const anchorY = H - PILOT_MARKER_PX + PILOT_MARKER_C;
+  const half = PILOT_MARKER_PX / 2;
   const label = username?.trim()
     ? `@${escapeHtml(username.trim())}`
     : "Pilot";
@@ -146,8 +151,8 @@ function otherPilotDivIcon(
       <div style="position:absolute;left:0;right:0;top:0;text-align:center;font:700 11px/1.2 system-ui,sans-serif;color:#ede9fe;text-shadow:0 1px 4px rgba(0,0,0,0.85);padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${W}px">
         ${label}
       </div>
-      <div style="position:absolute;left:50%;bottom:0;margin-left:-20px;width:40px;height:48px;transform:rotate(${h}deg);transform-origin:${ox}px ${oy}px">
-        ${chevronSvgPath(fillHex)}
+      <div style="position:absolute;left:50%;bottom:0;margin-left:-${half}px;width:${PILOT_MARKER_PX}px;height:${PILOT_MARKER_PX}px;transform:rotate(${h}deg);transform-origin:${ox}px ${oy}px">
+        ${pilotMarkerSvg(fillHex)}
       </div>
     </div>`,
     iconSize: [W, H],
@@ -366,8 +371,8 @@ export function FlightMap({
         Amber line = route; rings = waypoints.{" "}
         <span className="text-violet-300/90">You</span> = purple diamond + stats
         box; <span className="text-slate-400">others</span> show @name above;
-        hover them for TRK / ALT / GS (true track and ground speed from the
-        bridge when connected).
+        hover them for HDG / ALT / GS (nose heading and ground speed from the
+        bridge when connected; TRK if a client sends true track).
         {myPos ? (
           <>
             {" "}

@@ -92,13 +92,17 @@ export async function POST(request: Request) {
       next.trackTrueDeg = trackTrueDeg;
       next.heading = trackTrueDeg;
     } else {
-      if (prev?.trackTrueDeg !== undefined) {
-        next.trackTrueDeg = prev.trackTrueDeg;
-      }
       if (headingLegacy !== undefined) {
         next.heading = headingLegacy;
+        // Nose-only update: do not keep stale `trackTrueDeg` or the map stays on TRK.
       } else if (prev?.heading !== undefined) {
         next.heading = prev.heading;
+      }
+      if (
+        headingLegacy === undefined &&
+        prev?.trackTrueDeg !== undefined
+      ) {
+        next.trackTrueDeg = prev.trackTrueDeg;
       }
     }
 
