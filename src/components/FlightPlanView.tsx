@@ -181,10 +181,13 @@ function DataList({
 export function FlightPlanView({
   data,
   allowLiveMap,
+  accountId,
 }: {
   data: unknown;
   /** Browser session only — enables live SSE for your user. */
   allowLiveMap: boolean;
+  /** Logged-in account id — styles “you” vs other pilots on the map. */
+  accountId?: string | null;
 }) {
   const d = data as { origin?: unknown; destination?: unknown };
   const origin = parseAirport(d.origin);
@@ -318,7 +321,11 @@ export function FlightPlanView({
         <h3 className="mb-3 text-sm font-medium text-slate-400">
           Route map
         </h3>
-        <FlightMap route={routeLatLngs} showLivePosition={allowLiveMap} />
+        <FlightMap
+          route={routeLatLngs}
+          showLivePosition={allowLiveMap}
+          accountId={accountId}
+        />
       </section>
 
       <div className="grid gap-4 md:grid-cols-2">

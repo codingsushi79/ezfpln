@@ -506,6 +506,7 @@ export function HomeApp() {
               <FlightPlanView
                 data={ofpData}
                 allowLiveMap={Boolean(session?.account)}
+                accountId={session?.account?.id ?? null}
               />
             )}
           </main>

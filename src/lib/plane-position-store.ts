@@ -24,3 +24,20 @@ export function getPlanePosition(userId: string): PlanePosition | null {
 export function clearPlanePosition(userId: string): void {
   byUser.delete(userId);
 }
+
+const STALE_MS = 15 * 60 * 1000;
+
+export type PlanePositionWithUser = {
+  userId: string;
+} & PlanePosition;
+
+/** All recent positions (bridge + sim), for multiplayer map. */
+export function getAllPlanePositions(): PlanePositionWithUser[] {
+  const now = Date.now();
+  const out: PlanePositionWithUser[] = [];
+  for (const [userId, p] of byUser) {
+    if (now - p.updatedAt > STALE_MS) continue;
+    out.push({ userId, ...p });
+  }
+  return out;
+}

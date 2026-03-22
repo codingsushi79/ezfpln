@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
 import { getSessionOptions } from "@/lib/session";
-import { getPlanePosition } from "@/lib/plane-position-store";
+import { getAllPlanePositions } from "@/lib/plane-position-store";
 import type { SessionData } from "@/types/session";
 
 export const dynamic = "force-dynamic";
@@ -34,9 +34,18 @@ export async function GET(request: Request) {
   const stream = new ReadableStream({
     start(controller) {
       const send = () => {
-        const p = getPlanePosition(userId);
+        const planes = getAllPlanePositions().map(
+          ({ userId, lat, lng, heading, altitudeFt, updatedAt }) => ({
+            userId,
+            lat,
+            lng,
+            ...(heading !== undefined ? { heading } : {}),
+            ...(altitudeFt !== undefined ? { altitudeFt } : {}),
+            updatedAt,
+          }),
+        );
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(p)}\n\n`),
+          encoder.encode(`data: ${JSON.stringify({ planes })}\n\n`),
         );
       };
       send();

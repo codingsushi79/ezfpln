@@ -17,19 +17,44 @@ const TILE_MAX_NATIVE = 19;
 const FIT_MAX_ZOOM = 15;
 const FOLLOW_PAN_MS = 280;
 
-function navigationChevronIcon(headingDeg: number) {
+/** Your aircraft — purple, matches in-app nav style. */
+const SELF_FILL = "#7c68f0";
+
+const OTHERS_PALETTE = [
+  "#f97316",
+  "#34d399",
+  "#fbbf24",
+  "#fb7185",
+  "#38bdf8",
+  "#a78bfa",
+  "#f472b6",
+  "#2dd4bf",
+];
+
+function fillForOtherUserId(userId: string): string {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) {
+    h = (h * 31 + userId.charCodeAt(i)) >>> 0;
+  }
+  return OTHERS_PALETTE[h % OTHERS_PALETTE.length];
+}
+
+/**
+ * Sleek delta / paper-plane silhouette: sharp nose, flared wings, concave rear,
+ * thick white outline (Google Maps–style).
+ */
+function deltaPlaneIcon(headingDeg: number, fillHex: string) {
   const h = Number.isFinite(headingDeg) ? headingDeg : 0;
-  const w = 36;
-  const hgt = 44;
+  const w = 44;
+  const hgt = 52;
   const ax = w / 2;
-  const ay = hgt / 2 + 2;
+  const ay = hgt / 2 + 3;
   return L.divIcon({
     className: "plane-live-marker leaflet-zoom-animated",
-    html: `<div style="transform:rotate(${h}deg);transform-origin:${ax}px ${ay}px;width:${w}px;height:${hgt}px;display:flex;align-items:center;justify-content:center;pointer-events:auto;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45)) drop-shadow(0 1px 0 rgba(255,255,255,.12))">
-      <svg width="${w}" height="${hgt}" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M18 3 L32 30 L22 25 L18 40 L14 25 L4 30 Z"
-          fill="#38bdf8" stroke="#e0f2fe" stroke-width="1.35" stroke-linejoin="round" stroke-linecap="round"/>
-        <path d="M18 10 L18 28" stroke="rgba(255,255,255,0.35)" stroke-width="1" stroke-linecap="round"/>
+    html: `<div style="transform:rotate(${h}deg);transform-origin:${ax}px ${ay}px;width:${w}px;height:${hgt}px;display:flex;align-items:center;justify-content:center;pointer-events:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))">
+      <svg width="${w}" height="${hgt}" viewBox="0 0 44 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M22 4 L40 27 Q36 31 30 29 L22 46 Q14 31 8 27 L4 27 Q10 18 22 4 Z"
+          fill="${fillHex}" stroke="#ffffff" stroke-width="2.85" stroke-linejoin="round" stroke-linecap="round"/>
       </svg>
     </div>`,
     iconSize: [w, hgt],
@@ -37,29 +62,40 @@ function navigationChevronIcon(headingDeg: number) {
   });
 }
 
+type PlaneOnMap = {
+  userId: string;
+  lat: number;
+  lng: number;
+  heading?: number;
+  updatedAt: number;
+};
+
 function MapViewController({
   positions,
-  live,
+  myPlane,
+  planes,
   followLive,
 }: {
   positions: [number, number][];
-  live: { lat: number; lng: number; heading?: number } | null;
+  myPlane: { lat: number; lng: number; heading?: number } | null;
+  planes: PlaneOnMap[];
   followLive: boolean;
 }) {
   const map = useMap();
   const routeSig = useMemo(() => JSON.stringify(positions), [positions]);
-  /** Only toggles when live appears/disappears — not on every SSE tick. */
-  const livePresence = live ? 1 : 0;
-  const liveRef = useRef(live);
+  const myPresence = myPlane ? 1 : 0;
+  const planesRef = useRef(planes);
   useEffect(() => {
-    liveRef.current = live;
-  }, [live]);
+    planesRef.current = planes;
+  }, [planes]);
+
+  const planeCount = planes.length;
 
   useEffect(() => {
     if (followLive) return;
-    const l = liveRef.current;
+    const list = planesRef.current;
     const pts: [number, number][] = [...positions];
-    if (l) pts.push([l.lat, l.lng]);
+    for (const p of list) pts.push([p.lat, p.lng]);
     if (pts.length === 0) return;
     if (pts.length === 1) {
       map.flyTo(pts[0], 12, { duration: 0.9, easeLinearity: 0.28 });
@@ -71,16 +107,16 @@ function MapViewController({
       duration: 1.2,
       easeLinearity: 0.28,
     });
-  }, [map, routeSig, followLive, livePresence, positions]);
+  }, [map, routeSig, followLive, myPresence, positions, planeCount]);
 
   useEffect(() => {
-    if (!followLive || !live) return;
-    map.panTo([live.lat, live.lng], {
+    if (!followLive || !myPlane) return;
+    map.panTo([myPlane.lat, myPlane.lng], {
       animate: true,
       duration: FOLLOW_PAN_MS / 1000,
       easeLinearity: 0.22,
     });
-  }, [map, followLive, live]);
+  }, [map, followLive, myPlane]);
 
   return null;
 }
@@ -88,22 +124,31 @@ function MapViewController({
 export function FlightMap({
   route,
   showLivePosition,
+  accountId,
 }: {
   route: LatLng[];
-  /** When true, subscribe to SSE (requires signed-in browser session). */
   showLivePosition: boolean;
+  /** Session account id — used to style “you” vs other pilots. */
+  accountId?: string | null;
 }) {
   const positions = useMemo(
     () => route.map((p) => [p.lat, p.lng] as [number, number]),
     [route],
   );
-  const [live, setLive] = useState<{
+  const [planes, setPlanes] = useState<PlaneOnMap[]>([]);
+  const [followLive, setFollowLive] = useState(false);
+  const followActive = followLive && showLivePosition;
+
+  const myPlane: {
     lat: number;
     lng: number;
     heading?: number;
-  } | null>(null);
-  const [followLive, setFollowLive] = useState(false);
-  const followActive = followLive && showLivePosition;
+  } | null = useMemo(() => {
+    if (!accountId) return null;
+    const p = planes.find((x) => x.userId === accountId);
+    if (!p) return null;
+    return { lat: p.lat, lng: p.lng, heading: p.heading };
+  }, [planes, accountId]);
 
   useEffect(() => {
     if (!showLivePosition) return;
@@ -113,54 +158,43 @@ export function FlightMap({
     es.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data) as {
-          lat?: number;
-          lng?: number;
-          heading?: number;
-        } | null;
-        if (
-          d &&
-          typeof d.lat === "number" &&
-          typeof d.lng === "number" &&
-          Number.isFinite(d.lat) &&
-          Number.isFinite(d.lng)
-        ) {
-          setLive({
-            lat: d.lat,
-            lng: d.lng,
-            heading: d.heading,
-          });
+          planes?: PlaneOnMap[];
+        };
+        if (Array.isArray(d.planes)) {
+          setPlanes(d.planes);
         } else {
-          setLive(null);
+          setPlanes([]);
         }
       } catch {
-        setLive(null);
+        setPlanes([]);
       }
     };
     es.onerror = () => {
-      /* keep last position; stream may reconnect */
+      /* keep last positions; stream may reconnect */
     };
     return () => es.close();
   }, [showLivePosition]);
 
   const defaultCenter: [number, number] = positions[0] ??
-    (live ? [live.lat, live.lng] : [39.5, -98.35]);
+    (planes[0] ? [planes[0].lat, planes[0].lng] : [39.5, -98.35]);
 
-  const onMarkerClick = useCallback(() => {
+  const onSelfMarkerClick = useCallback(() => {
     if (!showLivePosition) return;
     setFollowLive((v) => !v);
   }, [showLivePosition]);
 
-  const livePos: [number, number] | null = live
-    ? [live.lat, live.lng]
+  const iconForPlane = useCallback((p: PlaneOnMap) => {
+    const isSelf = Boolean(accountId && p.userId === accountId);
+    const fill = isSelf ? SELF_FILL : fillForOtherUserId(p.userId);
+    return deltaPlaneIcon(p.heading ?? 0, fill);
+  }, [accountId]);
+
+  const hasTraffic = planes.length > 0;
+  const myPos: [number, number] | null = myPlane
+    ? [myPlane.lat, myPlane.lng]
     : null;
 
-  const heading = live?.heading ?? 0;
-  const chevronIcon = useMemo(
-    () => navigationChevronIcon(heading),
-    [heading],
-  );
-
-  if (positions.length < 2 && !live) {
+  if (positions.length < 2 && !hasTraffic) {
     return (
       <div className="rounded-2xl border border-slate-700/80 bg-slate-900/40 px-4 py-8 text-center text-sm text-slate-500">
         No lat/lon in this OFP for a route line.
@@ -168,13 +202,13 @@ export function FlightMap({
           <>
             {" "}
             Sign in here, generate a bridge code on the site, and enter it in the
-            MSFS bridge to see your live aircraft on the map.
+            MSFS bridge to see live aircraft on the map.
           </>
         ) : (
           <>
             {" "}
-            Live position appears after you link the bridge with a code from this
-            site.
+            Live traffic appears when pilots connect the bridge with a code from
+            this site.
           </>
         )}
       </div>
@@ -184,12 +218,14 @@ export function FlightMap({
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-700/80 ring-1 ring-slate-600/30">
       <p className="border-b border-slate-700/80 bg-slate-900/60 px-4 py-2 text-xs text-slate-500">
-        Route polyline from SimBrief; amber = plan. Cyan chevron = you (bridge).
-        {livePos ? (
+        Route = amber line.{" "}
+        <span className="text-violet-300/90">Purple delta</span> = you; other
+        colors = other pilots online.
+        {myPos ? (
           <>
             {" "}
             <span className="text-slate-400">
-              Click the chevron to{" "}
+              Click <span className="text-violet-300/90">your</span> icon to{" "}
               {followActive ? (
                 <button
                   type="button"
@@ -209,7 +245,7 @@ export function FlightMap({
         ) : null}
         {!showLivePosition ? (
           <span className="ml-1 text-amber-200/80">
-            Sign in to see your position.
+            Sign in to see live traffic.
           </span>
         ) : null}
       </p>
@@ -242,17 +278,25 @@ export function FlightMap({
             }}
           />
         ) : null}
-        {livePos ? (
+        {planes.map((p) => (
           <Marker
-            position={livePos}
-            icon={chevronIcon}
-            eventHandlers={{ click: onMarkerClick }}
-            zIndexOffset={800}
+            key={p.userId}
+            position={[p.lat, p.lng]}
+            icon={iconForPlane(p)}
+            zIndexOffset={
+              accountId && p.userId === accountId ? 1000 : 500
+            }
+            eventHandlers={
+              accountId && p.userId === accountId
+                ? { click: onSelfMarkerClick }
+                : {}
+            }
           />
-        ) : null}
+        ))}
         <MapViewController
           positions={positions}
-          live={live}
+          myPlane={myPlane}
+          planes={planes}
           followLive={followActive}
         />
       </MapContainer>
