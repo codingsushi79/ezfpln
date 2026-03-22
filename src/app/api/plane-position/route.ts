@@ -55,16 +55,22 @@ export async function POST(request: Request) {
         { status: 400, headers: cors },
       );
     }
-    /** True track over ground (° true) — direction of motion; bridge sends this. */
+    /** True track over ground (° true) — direction of motion over the ground. */
     const trackTrueDeg = pickOptionalFinite(body, [
       "trackTrueDeg",
       "trackDeg",
-      "trueHeadingDeg",
       "trueTrackDeg",
     ]);
     const hasTrack = trackTrueDeg !== undefined;
 
-    const headingLegacy = pickOptionalFinite(body, ["heading"]);
+    /** Nose / true heading (° true). Not the same as ground track. */
+    const headingLegacy = pickOptionalFinite(body, [
+      "heading",
+      "headingDeg",
+      "headingTrueDeg",
+      "trueHeadingDeg",
+      "planeHeadingDegreesTrue",
+    ]);
 
     const altitudeFt = pickOptionalFinite(body, [
       "altitudeFt",

@@ -2,8 +2,8 @@ export type PlanePosition = {
   lat: number;
   lng: number;
   /**
-   * True track over ground (° true): direction of motion. Preferred for map
-   * rotation when set (MSFS bridge sends this).
+   * True track over ground (° true): direction of motion. Optional; the MSFS
+   * bridge sends nose heading as `heading` unless a client sends track.
    */
   trackTrueDeg?: number;
   /**

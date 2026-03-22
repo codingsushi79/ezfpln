@@ -51,7 +51,7 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** True track (bridge) vs legacy nose heading. */
+/** True ground track vs nose heading (HDG). */
 function fmtTrkOrHdg(
   deg: number | undefined,
   hasTrueTrack: boolean,
@@ -381,7 +381,7 @@ export function FlightMap({
         <span className="text-violet-300/90">You</span> = purple diamond + stats
         box; <span className="text-slate-400">others</span> show @name above;
         hover them for HDG / ALT / GS (nose heading and ground speed from the
-        bridge when connected; TRK if a client sends true track).
+        bridge when connected; TRK only if a client sends ground track).
         {myPos ? (
           <>
             {" "}
