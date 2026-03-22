@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getIronSession } from "iron-session";
+import { DatabaseError } from "pg";
 import { getSessionOptions } from "@/lib/session";
 import { createUser } from "@/lib/users-repo";
 import type { SessionData } from "@/types/session";
-import Database from "better-sqlite3";
 
 export const runtime = "nodejs";
 
@@ -32,9 +32,9 @@ export async function POST(request: Request) {
     }
     let user;
     try {
-      user = createUser(email, password);
+      user = await createUser(email, password);
     } catch (e) {
-      if (e instanceof Database.SqliteError && e.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      if (e instanceof DatabaseError && e.code === "23505") {
         return NextResponse.json(
           { error: "That email is already registered." },
           { status: 409 },

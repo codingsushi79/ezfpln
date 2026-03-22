@@ -1,43 +1,53 @@
-import fs from "node:fs";
-import path from "node:path";
-import Database from "better-sqlite3";
+import { Pool, type QueryResult, type QueryResultRow } from "pg";
 
-let singleton: Database.Database | null = null;
+let pool: Pool | null = null;
+let schemaPromise: Promise<void> | null = null;
 
-function ensureDir(dir: string) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+function getPool(): Pool {
+  if (!pool) {
+    const url = process.env.DATABASE_URL?.trim();
+    if (!url) {
+      throw new Error(
+        "DATABASE_URL must be set (PostgreSQL connection string, e.g. postgresql://user:pass@localhost:5432/ezflpln).",
+      );
+    }
+    pool = new Pool({ connectionString: url });
+  }
+  return pool;
 }
 
-function initSchema(db: Database.Database) {
-  db.exec(`
-    PRAGMA foreign_keys = ON;
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE COLLATE NOCASE,
-      password_hash TEXT NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS bridge_tokens (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      token_hash TEXT NOT NULL UNIQUE,
-      created_at INTEGER NOT NULL,
-      last_used_at INTEGER,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_bridge_tokens_user ON bridge_tokens(user_id);
-  `);
+async function ensureSchema(): Promise<void> {
+  if (!schemaPromise) {
+    schemaPromise = (async () => {
+      const p = getPool();
+      await p.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          created_at BIGINT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower ON users (lower(email));
+      `);
+      await p.query(`
+        CREATE TABLE IF NOT EXISTS bridge_tokens (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token_hash TEXT NOT NULL UNIQUE,
+          created_at BIGINT NOT NULL,
+          last_used_at BIGINT
+        );
+        CREATE INDEX IF NOT EXISTS idx_bridge_tokens_user ON bridge_tokens(user_id);
+      `);
+    })();
+  }
+  await schemaPromise;
 }
 
-export function getDb(): Database.Database {
-  if (singleton) return singleton;
-  const dbPath =
-    process.env.DATABASE_PATH ??
-    path.join(process.cwd(), "data", "ezflpln.db");
-  ensureDir(path.dirname(dbPath));
-  const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
-  initSchema(db);
-  singleton = db;
-  return db;
+export async function query<T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params?: unknown[],
+): Promise<QueryResult<T>> {
+  await ensureSchema();
+  return getPool().query<T>(text, params);
 }

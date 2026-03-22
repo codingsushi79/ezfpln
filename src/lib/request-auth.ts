@@ -19,9 +19,9 @@ export async function getUserIdFromRequest(
     ? auth.slice(7).trim()
     : null;
   if (bearer) {
-    const uid = verifyBridgeToken(bearer);
+    const uid = await verifyBridgeToken(bearer);
     if (uid) {
-      touchBridgeToken(bearer);
+      await touchBridgeToken(bearer);
       return uid;
     }
     return null;

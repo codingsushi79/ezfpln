@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     };
     const email = body.email?.trim() ?? "";
     const password = body.password ?? "";
-    const user = getUserByEmail(email);
+    const user = await getUserByEmail(email);
     if (!user || !verifyPassword(password, user.password_hash)) {
       return NextResponse.json(
         { error: "Invalid email or password." },
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       );
     }
     if (body.client === "bridge") {
-      const token = mintBridgeTokenForUser(user.id);
+      const token = await mintBridgeTokenForUser(user.id);
       return NextResponse.json({
         ok: true,
         token,
