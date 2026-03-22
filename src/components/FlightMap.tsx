@@ -75,10 +75,24 @@ function fmtGs(kt: number | undefined): string {
   return `GS ${Math.round(kt)} kts`;
 }
 
+/**
+ * Google Maps–style swallowtail: one point forward, two rear corners, inverted-V
+ * notch between them (same silhouette as your reference image).
+ * viewBox height 48; rotation anchor at bottom center (20, 41).
+ */
 function chevronSvgPath(fillHex: string): string {
-  return `<svg width="40" height="52" viewBox="0 0 40 52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M20 6 L34 24 Q35.2 26.2 33.2 28 L22 42 Q20 44.5 18 42 L6.8 28 Q4.8 26.2 6 24 L20 6 Z"
-          fill="${fillHex}" stroke="#ffffff" stroke-width="2.9" stroke-linejoin="round" stroke-linecap="round"/>
+  const stroke = "#ffffff";
+  const w = 3.2;
+  return `<svg width="40" height="48" viewBox="0 0 40 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path
+          d="M 20 4.5 L 4 17.5 L 8 40.5 L 20 27.5 L 32 40.5 L 36 17.5 Z"
+          fill="${fillHex}"
+          stroke="${stroke}"
+          stroke-width="${w}"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+          vector-effect="non-scaling-stroke"
+        />
       </svg>`;
 }
 
@@ -91,13 +105,15 @@ function selfPilotDivIcon(
   const h = Number.isFinite(headingDeg) ? headingDeg : 0;
   const W = 130;
   const H = 54;
-  const ax = 20;
-  const ay = 48;
+  const ox = 20;
+  const oy = 41;
+  const anchorX = 20;
+  const anchorY = H - 48 + oy;
   const box = `${escapeHtml(lines.hdg)}<br>${escapeHtml(lines.alt)}<br>${escapeHtml(lines.spd)}`;
   return L.divIcon({
     className: "plane-live-marker leaflet-zoom-animated",
     html: `<div style="position:relative;width:${W}px;height:${H}px;pointer-events:auto;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))">
-      <div style="position:absolute;left:0;bottom:0;width:40px;height:52px;transform:rotate(${h}deg);transform-origin:${ax}px ${ay}px">
+      <div style="position:absolute;left:0;bottom:0;width:40px;height:48px;transform:rotate(${h}deg);transform-origin:${ox}px ${oy}px">
         ${chevronSvgPath(fillHex)}
       </div>
       <div style="position:absolute;left:46px;top:4px;min-width:72px;max-width:88px;border-radius:10px;border:1px solid rgba(148,163,184,0.45);background:rgba(15,23,42,0.95);padding:5px 8px;font:600 10px/1.35 ui-monospace,SFMono-Regular,monospace;color:#e2e8f0;text-align:left">
@@ -105,7 +121,7 @@ function selfPilotDivIcon(
       </div>
     </div>`,
     iconSize: [W, H],
-    iconAnchor: [ax, ay],
+    iconAnchor: [anchorX, anchorY],
   });
 }
 
@@ -117,9 +133,11 @@ function otherPilotDivIcon(
 ) {
   const h = Number.isFinite(headingDeg) ? headingDeg : 0;
   const W = 96;
-  const H = 70;
-  const ax = 48;
-  const ay = 64;
+  const H = 68;
+  const ox = 20;
+  const oy = 41;
+  const anchorX = W / 2;
+  const anchorY = H - 48 + oy;
   const label = username?.trim()
     ? `@${escapeHtml(username.trim())}`
     : "Pilot";
@@ -129,12 +147,12 @@ function otherPilotDivIcon(
       <div style="position:absolute;left:0;right:0;top:0;text-align:center;font:700 11px/1.2 system-ui,sans-serif;color:#ede9fe;text-shadow:0 1px 4px rgba(0,0,0,0.85);padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${W}px">
         ${label}
       </div>
-      <div style="position:absolute;left:50%;bottom:0;margin-left:-20px;width:40px;height:52px;transform:rotate(${h}deg);transform-origin:20px 46px">
+      <div style="position:absolute;left:50%;bottom:0;margin-left:-20px;width:40px;height:48px;transform:rotate(${h}deg);transform-origin:${ox}px ${oy}px">
         ${chevronSvgPath(fillHex)}
       </div>
     </div>`,
     iconSize: [W, H],
-    iconAnchor: [ax, ay],
+    iconAnchor: [anchorX, anchorY],
   });
 }
 
