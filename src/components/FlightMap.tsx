@@ -76,16 +76,15 @@ function fmtGs(kt: number | undefined): string {
 }
 
 /**
- * Google Maps–style swallowtail: one point forward, two rear corners, inverted-V
- * notch between them (same silhouette as your reference image).
- * viewBox height 48; rotation anchor at bottom center (20, 41).
+ * Four-sided diamond (rhombus): tip points along track; rotation anchor at
+ * bottom vertex (20, 44) in viewBox coords.
  */
 function chevronSvgPath(fillHex: string): string {
   const stroke = "#ffffff";
   const w = 3.2;
   return `<svg width="40" height="48" viewBox="0 0 40 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path
-          d="M 20 4.5 L 4 17.5 L 8 40.5 L 20 27.5 L 32 40.5 L 36 17.5 Z"
+          d="M 20 4 L 36 24 L 20 44 L 4 24 Z"
           fill="${fillHex}"
           stroke="${stroke}"
           stroke-width="${w}"
@@ -96,7 +95,7 @@ function chevronSvgPath(fillHex: string): string {
       </svg>`;
 }
 
-/** You: chevron rotates; rounded stats box stays upright to the right. */
+/** You: diamond rotates; rounded stats box stays upright to the right. */
 function selfPilotDivIcon(
   headingDeg: number,
   fillHex: string,
@@ -106,7 +105,7 @@ function selfPilotDivIcon(
   const W = 130;
   const H = 54;
   const ox = 20;
-  const oy = 41;
+  const oy = 44;
   const anchorX = 20;
   const anchorY = H - 48 + oy;
   const box = `${escapeHtml(lines.hdg)}<br>${escapeHtml(lines.alt)}<br>${escapeHtml(lines.spd)}`;
@@ -125,7 +124,7 @@ function selfPilotDivIcon(
   });
 }
 
-/** Others: @username fixed above icon; chevron rotates beneath. */
+/** Others: @username fixed above icon; diamond rotates beneath. */
 function otherPilotDivIcon(
   headingDeg: number,
   fillHex: string,
@@ -135,7 +134,7 @@ function otherPilotDivIcon(
   const W = 96;
   const H = 68;
   const ox = 20;
-  const oy = 41;
+  const oy = 44;
   const anchorX = W / 2;
   const anchorY = H - 48 + oy;
   const label = username?.trim()
@@ -365,7 +364,7 @@ export function FlightMap({
     <div className="overflow-hidden rounded-2xl border border-slate-700/80 ring-1 ring-slate-600/30">
       <p className="border-b border-slate-700/80 bg-slate-900/60 px-4 py-2 text-xs text-slate-500">
         Amber line = route; rings = waypoints.{" "}
-        <span className="text-violet-300/90">You</span> = purple chevron + stats
+        <span className="text-violet-300/90">You</span> = purple diamond + stats
         box; <span className="text-slate-400">others</span> show @name above;
         hover them for TRK / ALT / GS (true track and ground speed from the
         bridge when connected).
@@ -373,7 +372,7 @@ export function FlightMap({
           <>
             {" "}
             <span className="text-slate-400">
-              Click <span className="text-violet-300/90">your</span> chevron to{" "}
+              Click <span className="text-violet-300/90">your</span> marker to{" "}
               {followActive ? (
                 <button
                   type="button"

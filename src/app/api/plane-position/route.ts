@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { pickOptionalFinite } from "@/lib/plane-position-parse";
 import { getUserIdFromRequest } from "@/lib/request-auth";
 import {
   getPlanePosition,
@@ -54,46 +55,65 @@ export async function POST(request: Request) {
         { status: 400, headers: cors },
       );
     }
-    const trackTrueDeg =
-      body.trackTrueDeg !== undefined
-        ? Number(body.trackTrueDeg)
-        : body.trackDeg !== undefined
-          ? Number(body.trackDeg)
-          : undefined;
-    const headingLegacy =
-      body.heading !== undefined ? Number(body.heading) : undefined;
-    const altitudeFt =
-      body.altitudeFt !== undefined
-        ? Number(body.altitudeFt)
-        : body.heightFt !== undefined
-          ? Number(body.heightFt)
-          : body.alt !== undefined
-            ? Number(body.alt)
-            : undefined;
-    const speedKtRaw =
-      body.speedKt !== undefined
-        ? Number(body.speedKt)
-        : body.gsKt !== undefined
-          ? Number(body.gsKt)
-          : body.groundSpeedKt !== undefined
-            ? Number(body.groundSpeedKt)
-            : undefined;
-    const hasTrack = Number.isFinite(trackTrueDeg);
-    const direction = hasTrack
-      ? (trackTrueDeg as number)
-      : Number.isFinite(headingLegacy)
-        ? (headingLegacy as number)
-        : undefined;
+    /** True track over ground (° true) — direction of motion; bridge sends this. */
+    const trackTrueDeg = pickOptionalFinite(body, [
+      "trackTrueDeg",
+      "trackDeg",
+      "trueHeadingDeg",
+      "trueTrackDeg",
+    ]);
+    const hasTrack = trackTrueDeg !== undefined;
+
+    const headingLegacy = pickOptionalFinite(body, ["heading"]);
+
+    const altitudeFt = pickOptionalFinite(body, [
+      "altitudeFt",
+      "heightFt",
+      "alt",
+      "mslFt",
+      "altitudeMslFt",
+    ]);
+
+    const speedKtRaw = pickOptionalFinite(body, [
+      "speedKt",
+      "gsKt",
+      "groundSpeedKt",
+      "groundSpeed",
+    ]);
+
+    const prev = getPlanePosition(userId);
+
     const next: Omit<PlanePosition, "updatedAt"> = {
       lat,
       lng,
-      ...(hasTrack ? { trackTrueDeg } : {}),
-      ...(direction !== undefined && Number.isFinite(direction)
-        ? { heading: direction }
-        : {}),
-      ...(Number.isFinite(altitudeFt) ? { altitudeFt } : {}),
-      ...(Number.isFinite(speedKtRaw) ? { speedKt: speedKtRaw } : {}),
     };
+
+    if (hasTrack) {
+      next.trackTrueDeg = trackTrueDeg;
+      next.heading = trackTrueDeg;
+    } else {
+      if (prev?.trackTrueDeg !== undefined) {
+        next.trackTrueDeg = prev.trackTrueDeg;
+      }
+      if (headingLegacy !== undefined) {
+        next.heading = headingLegacy;
+      } else if (prev?.heading !== undefined) {
+        next.heading = prev.heading;
+      }
+    }
+
+    if (altitudeFt !== undefined) {
+      next.altitudeFt = altitudeFt;
+    } else if (prev?.altitudeFt !== undefined) {
+      next.altitudeFt = prev.altitudeFt;
+    }
+
+    if (speedKtRaw !== undefined) {
+      next.speedKt = speedKtRaw;
+    } else if (prev?.speedKt !== undefined) {
+      next.speedKt = prev.speedKt;
+    }
+
     setPlanePosition(userId, next);
     return NextResponse.json({ ok: true }, { headers: cors });
   } catch {
