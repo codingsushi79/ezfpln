@@ -77,20 +77,29 @@ function fmtGs(kt: number | undefined): string {
 
 /** Pixel size of the rotating SVG (square viewBox). */
 const PILOT_MARKER_PX = 48;
-/** Center of viewBox — map anchor + rotation pivot (symmetric shape). */
-const PILOT_MARKER_C = PILOT_MARKER_PX / 2;
+/**
+ * Rotation + map anchor in viewBox coords (centroid of the wedge).
+ * Asymmetric “navigation” shape so heading is obvious (Google Maps–style wedge).
+ */
+const PILOT_MARKER_OX = 24;
+const PILOT_MARKER_OY = 24.4;
 
 /**
- * Sleek symmetric heading diamond: top vertex = track direction; fill is the
- * only color token (recolor via `fillHex`). Center (24,24) = map position.
+ * Google Maps / CarPlay–style navigation wedge (no outer ring): sharp nose,
+ * wide tail, center notch — reads clearly as “this way forward”. Main fill is
+ * `fillHex`; left facet uses a white gloss so direction pops in any hue.
  */
 function pilotMarkerSvg(fillHex: string): string {
   const stroke = "#ffffff";
-  const sw = 2.35;
+  const sw = 2.2;
+  const outline =
+    "M 24 4.5 L 41.5 37.5 L 24 31.2 L 6.5 37.5 Z";
   return `<svg width="${PILOT_MARKER_PX}" height="${PILOT_MARKER_PX}" viewBox="0 0 ${PILOT_MARKER_PX} ${PILOT_MARKER_PX}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="${outline}" fill="${fillHex}" />
+        <path d="M 24 4.5 L 6.5 37.5 L 24 31.2 Z" fill="#ffffff" fill-opacity="0.32" />
         <path
-          d="M 24 5.5 L 40.5 24 L 24 42.5 L 7.5 24 Z"
-          fill="${fillHex}"
+          d="${outline}"
+          fill="none"
           stroke="${stroke}"
           stroke-width="${sw}"
           stroke-linejoin="round"
@@ -108,10 +117,10 @@ function selfPilotDivIcon(
   const h = Number.isFinite(headingDeg) ? headingDeg : 0;
   const W = 130;
   const H = 54;
-  const ox = PILOT_MARKER_C;
-  const oy = PILOT_MARKER_C;
-  const anchorX = PILOT_MARKER_C;
-  const anchorY = H - PILOT_MARKER_PX + PILOT_MARKER_C;
+  const ox = PILOT_MARKER_OX;
+  const oy = PILOT_MARKER_OY;
+  const anchorX = PILOT_MARKER_OX;
+  const anchorY = H - PILOT_MARKER_PX + PILOT_MARKER_OY;
   const box = `${escapeHtml(lines.hdg)}<br>${escapeHtml(lines.alt)}<br>${escapeHtml(lines.spd)}`;
   return L.divIcon({
     className: "plane-live-marker leaflet-zoom-animated",
@@ -137,10 +146,10 @@ function otherPilotDivIcon(
   const h = Number.isFinite(headingDeg) ? headingDeg : 0;
   const W = 96;
   const H = 68;
-  const ox = PILOT_MARKER_C;
-  const oy = PILOT_MARKER_C;
+  const ox = PILOT_MARKER_OX;
+  const oy = PILOT_MARKER_OY;
   const anchorX = W / 2;
-  const anchorY = H - PILOT_MARKER_PX + PILOT_MARKER_C;
+  const anchorY = H - PILOT_MARKER_PX + PILOT_MARKER_OY;
   const half = PILOT_MARKER_PX / 2;
   const label = username?.trim()
     ? `@${escapeHtml(username.trim())}`
