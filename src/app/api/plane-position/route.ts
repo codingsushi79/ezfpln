@@ -54,14 +54,22 @@ export async function POST(request: Request) {
         { status: 400, headers: cors },
       );
     }
-    const heading =
+    const trackTrueDeg =
+      body.trackTrueDeg !== undefined
+        ? Number(body.trackTrueDeg)
+        : body.trackDeg !== undefined
+          ? Number(body.trackDeg)
+          : undefined;
+    const headingLegacy =
       body.heading !== undefined ? Number(body.heading) : undefined;
     const altitudeFt =
       body.altitudeFt !== undefined
         ? Number(body.altitudeFt)
-        : body.alt !== undefined
-          ? Number(body.alt)
-          : undefined;
+        : body.heightFt !== undefined
+          ? Number(body.heightFt)
+          : body.alt !== undefined
+            ? Number(body.alt)
+            : undefined;
     const speedKtRaw =
       body.speedKt !== undefined
         ? Number(body.speedKt)
@@ -70,10 +78,19 @@ export async function POST(request: Request) {
           : body.groundSpeedKt !== undefined
             ? Number(body.groundSpeedKt)
             : undefined;
+    const hasTrack = Number.isFinite(trackTrueDeg);
+    const direction = hasTrack
+      ? (trackTrueDeg as number)
+      : Number.isFinite(headingLegacy)
+        ? (headingLegacy as number)
+        : undefined;
     const next: Omit<PlanePosition, "updatedAt"> = {
       lat,
       lng,
-      ...(Number.isFinite(heading) ? { heading } : {}),
+      ...(hasTrack ? { trackTrueDeg } : {}),
+      ...(direction !== undefined && Number.isFinite(direction)
+        ? { heading: direction }
+        : {}),
       ...(Number.isFinite(altitudeFt) ? { altitudeFt } : {}),
       ...(Number.isFinite(speedKtRaw) ? { speedKt: speedKtRaw } : {}),
     };

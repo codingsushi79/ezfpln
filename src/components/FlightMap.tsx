@@ -51,10 +51,17 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function fmtHdg(deg: number | undefined): string {
-  if (deg === undefined || !Number.isFinite(deg)) return "HDG —";
+/** True track (bridge) vs legacy nose heading. */
+function fmtTrkOrHdg(
+  deg: number | undefined,
+  hasTrueTrack: boolean,
+): string {
+  if (deg === undefined || !Number.isFinite(deg)) {
+    return hasTrueTrack ? "TRK —" : "HDG —";
+  }
   const v = Math.round(((deg % 360) + 360) % 360);
-  return `HDG ${String(v).padStart(3, "0")}°`;
+  const label = hasTrueTrack ? "TRK" : "HDG";
+  return `${label} ${String(v).padStart(3, "0")}°`;
 }
 
 function fmtAlt(ft: number | undefined): string {
@@ -63,9 +70,9 @@ function fmtAlt(ft: number | undefined): string {
   return `${Math.round(ft)} ft`;
 }
 
-function fmtSpd(kt: number | undefined): string {
-  if (kt === undefined || !Number.isFinite(kt)) return "— kts";
-  return `${Math.round(kt)} kts`;
+function fmtGs(kt: number | undefined): string {
+  if (kt === undefined || !Number.isFinite(kt)) return "GS —";
+  return `GS ${Math.round(kt)} kts`;
 }
 
 function chevronSvgPath(fillHex: string): string {
@@ -136,11 +143,23 @@ type PlaneOnMap = {
   lat: number;
   lng: number;
   username?: string | null;
+  trackTrueDeg?: number;
   heading?: number;
   altitudeFt?: number;
   speedKt?: number;
   updatedAt: number;
 };
+
+function mapRotationDeg(p: PlaneOnMap): number {
+  const d = p.trackTrueDeg ?? p.heading;
+  return Number.isFinite(d) ? d! : 0;
+}
+
+function hasTrueTrack(p: PlaneOnMap): boolean {
+  return (
+    p.trackTrueDeg !== undefined && Number.isFinite(p.trackTrueDeg)
+  );
+}
 
 function MapViewController({
   positions,
@@ -149,7 +168,12 @@ function MapViewController({
   followLive,
 }: {
   positions: [number, number][];
-  myPlane: { lat: number; lng: number; heading?: number } | null;
+  myPlane: {
+    lat: number;
+    lng: number;
+    heading?: number;
+    trackTrueDeg?: number;
+  } | null;
   planes: PlaneOnMap[];
   followLive: boolean;
 }) {
@@ -194,11 +218,13 @@ function MapViewController({
 }
 
 function statsTooltipLines(p: PlaneOnMap) {
+  const rot = mapRotationDeg(p);
+  const tt = hasTrueTrack(p);
   return (
     <div className="space-y-0.5 font-mono leading-tight">
-      <p>{fmtHdg(p.heading)}</p>
+      <p>{fmtTrkOrHdg(rot, tt)}</p>
       <p>{fmtAlt(p.altitudeFt)}</p>
-      <p>{fmtSpd(p.speedKt)}</p>
+      <p>{fmtGs(p.speedKt)}</p>
     </div>
   );
 }
@@ -227,11 +253,17 @@ export function FlightMap({
     lat: number;
     lng: number;
     heading?: number;
+    trackTrueDeg?: number;
   } | null = useMemo(() => {
     if (!accountId) return null;
     const p = planes.find((x) => x.userId === accountId);
     if (!p) return null;
-    return { lat: p.lat, lng: p.lng, heading: p.heading };
+    return {
+      lat: p.lat,
+      lng: p.lng,
+      heading: p.heading,
+      trackTrueDeg: p.trackTrueDeg,
+    };
   }, [planes, accountId]);
 
   useEffect(() => {
@@ -272,13 +304,15 @@ export function FlightMap({
       const isSelf = Boolean(accountId && p.userId === accountId);
       const fill = isSelf ? SELF_FILL : fillForOtherUserId(p.userId);
       if (isSelf) {
-        return selfPilotDivIcon(p.heading ?? 0, fill, {
-          hdg: fmtHdg(p.heading),
+        const rot = mapRotationDeg(p);
+        const tt = hasTrueTrack(p);
+        return selfPilotDivIcon(rot, fill, {
+          hdg: fmtTrkOrHdg(rot, tt),
           alt: fmtAlt(p.altitudeFt),
-          spd: fmtSpd(p.speedKt),
+          spd: fmtGs(p.speedKt),
         });
       }
-      return otherPilotDivIcon(p.heading ?? 0, fill, p.username);
+      return otherPilotDivIcon(mapRotationDeg(p), fill, p.username);
     },
     [accountId],
   );
@@ -315,7 +349,8 @@ export function FlightMap({
         Amber line = route; rings = waypoints.{" "}
         <span className="text-violet-300/90">You</span> = purple chevron + stats
         box; <span className="text-slate-400">others</span> show @name above;
-        hover them for HDG / ALT / speed.
+        hover them for TRK / ALT / GS (true track and ground speed from the
+        bridge when connected).
         {myPos ? (
           <>
             {" "}

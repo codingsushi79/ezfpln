@@ -1,9 +1,19 @@
 export type PlanePosition = {
   lat: number;
   lng: number;
+  /**
+   * True track over ground (° true): direction of motion. Preferred for map
+   * rotation when set (MSFS bridge sends this).
+   */
+  trackTrueDeg?: number;
+  /**
+   * Direction for map rotation when `trackTrueDeg` is absent (legacy bridges
+   * that sent nose heading only).
+   */
   heading?: number;
+  /** Altitude / height MSL, feet. */
   altitudeFt?: number;
-  /** Ground or indicated speed, knots (from sim / bridge). */
+  /** Ground speed, knots. */
   speedKt?: number;
   updatedAt: number;
 };
