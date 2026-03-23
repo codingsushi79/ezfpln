@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 
 const MAC_DMG_URL =
   "https://github.com/codingsushi79/ezfpln/releases/download/v1.0.0/EzFlightPlan.dmg";
@@ -12,13 +12,11 @@ function DownloadCard({
   url,
   fileLabel,
   description,
-  autoStart,
 }: {
   title: string;
   url: string;
   fileLabel: string;
   description: string;
-  autoStart?: boolean;
 }) {
   const confirmAndOpen = () => {
     // Browser-controlled download links often require a user gesture.
@@ -50,39 +48,13 @@ function DownloadCard({
       >
         Download
       </a>
-
-      {autoStart ? (
-        <p className="mt-4 text-xs text-slate-400">
-          Your download has started automatically. If it hasn&apos;t click{" "}
-          <a
-            className="text-amber-200 underline underline-offset-4"
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-              onClick={(e) => {
-                e.preventDefault();
-                confirmAndOpen();
-              }}
-          >
-            HERE
-          </a>
-          .
-        </p>
-      ) : null}
     </div>
   );
 }
 
 export default function DownloadPage() {
-  useEffect(() => {
-    // Best-effort “auto start” without redirecting this page.
-    // We open in a new tab so the user stays on /download.
-    try {
-      window.open(MAC_DMG_URL, "_blank", "noopener,noreferrer");
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  // Intentionally no auto-download on page load; downloads start only
+  // after explicit user click (with a confirm dialog).
 
   return (
     <div className="min-h-full bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(251,191,36,0.12),transparent)]">
@@ -103,7 +75,6 @@ export default function DownloadPage() {
             url={MAC_DMG_URL}
             fileLabel="EzFlightPlan.dmg"
             description="The flight planning app."
-            autoStart
           />
           <DownloadCard
             title="MSFS injector"
