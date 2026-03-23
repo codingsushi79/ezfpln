@@ -20,6 +20,14 @@ function DownloadCard({
   description: string;
   autoStart?: boolean;
 }) {
+  const confirmAndOpen = () => {
+    // Browser-controlled download links often require a user gesture.
+    // We gate the actual open() behind a confirm dialog.
+    const ok = window.confirm(`Start downloading ${fileLabel}?`);
+    if (!ok) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="rounded-2xl border border-slate-700/80 bg-slate-900/50 p-6 backdrop-blur-sm">
       <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
@@ -34,6 +42,10 @@ function DownloadCard({
         href={url}
         target="_blank"
         rel="noreferrer"
+        onClick={(e) => {
+          e.preventDefault();
+          confirmAndOpen();
+        }}
         className="mt-5 inline-flex w-full items-center justify-center rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/15"
       >
         Download
@@ -47,6 +59,10 @@ function DownloadCard({
             href={url}
             target="_blank"
             rel="noreferrer"
+              onClick={(e) => {
+                e.preventDefault();
+                confirmAndOpen();
+              }}
           >
             HERE
           </a>
