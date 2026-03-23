@@ -1,10 +1,9 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import React, { useEffect } from "react";
 
 const MAC_DMG_URL =
-  "https://github.com/codingsushi79/ezflpln/releases/download/v1.0.0/EzFlightPlan.dmg";
+  "https://github.com/codingsushi79/ezfpln/releases/download/v1.0.0/EzFlightPlan.dmg";
 const MSFS_EXE_URL =
   "https://github.com/codingsushi79/ezflpln-msfs-bridge/releases/download/v1.0.0/EzFlightPlan.exe";
 
@@ -13,11 +12,13 @@ function DownloadCard({
   url,
   fileLabel,
   description,
+  autoStart,
 }: {
   title: string;
   url: string;
   fileLabel: string;
   description: string;
+  autoStart?: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-slate-700/80 bg-slate-900/50 p-6 backdrop-blur-sm">
@@ -38,37 +39,33 @@ function DownloadCard({
         Download
       </a>
 
-      <p className="mt-4 text-xs text-slate-400">
-        Your download has started automatically. If it hasn&apos;t click{" "}
-        <a className="text-amber-200 underline underline-offset-4" href={url} target="_blank" rel="noreferrer">
-          HERE
-        </a>
-        .
-      </p>
+      {autoStart ? (
+        <p className="mt-4 text-xs text-slate-400">
+          Your download has started automatically. If it hasn&apos;t click{" "}
+          <a
+            className="text-amber-200 underline underline-offset-4"
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            HERE
+          </a>
+          .
+        </p>
+      ) : null}
     </div>
   );
 }
 
 export default function DownloadPage() {
   useEffect(() => {
-    // Some browsers require user gesture for downloads; we still attempt
-    // automatic start, and provide the "HERE" link as a fallback.
-    const kick = (href: string) => {
-      try {
-        const a = document.createElement("a");
-        a.href = href;
-        a.target = "_self";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      } catch {
-        /* ignore */
-      }
-    };
-
-    // Kick both in sequence (order matters so the UI matches expectations).
-    kick(MAC_DMG_URL);
-    setTimeout(() => kick(MSFS_EXE_URL), 600);
+    // Best-effort “auto start” without redirecting this page.
+    // We open in a new tab so the user stays on /download.
+    try {
+      window.open(MAC_DMG_URL, "_blank", "noopener,noreferrer");
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   return (
@@ -90,6 +87,7 @@ export default function DownloadPage() {
             url={MAC_DMG_URL}
             fileLabel="EzFlightPlan.dmg"
             description="The flight planning app."
+            autoStart
           />
           <DownloadCard
             title="MSFS injector"
