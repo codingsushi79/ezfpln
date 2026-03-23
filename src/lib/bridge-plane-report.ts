@@ -8,6 +8,7 @@ export type PlanePositionSnapshot = {
   lat: number;
   lng: number;
   headingTrueDeg?: number;
+  trackTrueDeg?: number;
   altitudeFt?: number;
   groundSpeedKt?: number;
 };
@@ -68,6 +69,15 @@ export function parsePlaneReportPostBody(body: unknown): ParsePlaneReportResult 
   ]);
   if (headingTrueDeg !== undefined) {
     snapshot.headingTrueDeg = norm360(headingTrueDeg);
+  }
+
+  const trackTrueDeg = pickFinite(o, [
+    "trackTrueDeg",
+    "trackDeg",
+    "trueTrackDeg",
+  ]);
+  if (trackTrueDeg !== undefined) {
+    snapshot.trackTrueDeg = norm360(trackTrueDeg);
   }
 
   const altitudeFt = pickFinite(o, [

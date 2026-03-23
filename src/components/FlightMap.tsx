@@ -19,7 +19,7 @@ const TILE_MAX_NATIVE = 19;
 const FIT_MAX_ZOOM = 15;
 const FOLLOW_PAN_MS = 280;
 
-/** Added to bridge heading for on-map HDG label + icon rotation. */
+/** Added to bridge heading for on-map HDG label + icon rotation (not applied to TRK). */
 const DISPLAY_HDG_OFFSET_DEG = 14;
 
 const SELF_FILL = "#7c3aed";
@@ -54,10 +54,17 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function fmtHdg(deg: number | undefined): string {
-  if (deg === undefined || !Number.isFinite(deg)) return "HDG —";
+/** True ground track vs nose heading (HDG). */
+function fmtTrkOrHdg(
+  deg: number | undefined,
+  hasTrueTrack: boolean,
+): string {
+  if (deg === undefined || !Number.isFinite(deg)) {
+    return hasTrueTrack ? "TRK —" : "HDG —";
+  }
   const v = Math.round(((deg % 360) + 360) % 360);
-  return `HDG ${String(v).padStart(3, "0")}°`;
+  const label = hasTrueTrack ? "TRK" : "HDG";
+  return `${label} ${String(v).padStart(3, "0")}°`;
 }
 
 function fmtAlt(ft: number | undefined): string {
@@ -170,6 +177,7 @@ type PlaneOnMap = {
   lat: number;
   lng: number;
   username?: string | null;
+  trackTrueDeg?: number;
   headingTrueDeg?: number;
   altitudeFt?: number;
   groundSpeedKt?: number;
@@ -177,9 +185,21 @@ type PlaneOnMap = {
 };
 
 function mapRotationDeg(p: PlaneOnMap): number {
+  if (
+    p.trackTrueDeg !== undefined &&
+    Number.isFinite(p.trackTrueDeg)
+  ) {
+    return p.trackTrueDeg;
+  }
   const h = p.headingTrueDeg;
   if (h === undefined || !Number.isFinite(h)) return 0;
   return ((h + DISPLAY_HDG_OFFSET_DEG) % 360 + 360) % 360;
+}
+
+function hasTrueTrack(p: PlaneOnMap): boolean {
+  return (
+    p.trackTrueDeg !== undefined && Number.isFinite(p.trackTrueDeg)
+  );
 }
 
 function MapViewController({
@@ -193,6 +213,7 @@ function MapViewController({
     lat: number;
     lng: number;
     headingTrueDeg?: number;
+    trackTrueDeg?: number;
   } | null;
   planes: PlaneOnMap[];
   followLive: boolean;
@@ -239,9 +260,10 @@ function MapViewController({
 
 function statsTooltipLines(p: PlaneOnMap) {
   const rot = mapRotationDeg(p);
+  const tt = hasTrueTrack(p);
   return (
     <div className="space-y-0.5 font-mono leading-tight">
-      <p>{fmtHdg(rot)}</p>
+      <p>{fmtTrkOrHdg(rot, tt)}</p>
       <p>{fmtAlt(p.altitudeFt)}</p>
       <p>{fmtGs(p.groundSpeedKt)}</p>
     </div>
@@ -272,6 +294,7 @@ export function FlightMap({
     lat: number;
     lng: number;
     headingTrueDeg?: number;
+    trackTrueDeg?: number;
   } | null = useMemo(() => {
     if (!accountId) return null;
     const p = planes.find((x) => x.userId === accountId);
@@ -280,6 +303,7 @@ export function FlightMap({
       lat: p.lat,
       lng: p.lng,
       headingTrueDeg: p.headingTrueDeg,
+      trackTrueDeg: p.trackTrueDeg,
     };
   }, [planes, accountId]);
 
@@ -322,8 +346,9 @@ export function FlightMap({
       const fill = isSelf ? SELF_FILL : fillForOtherUserId(p.userId);
       if (isSelf) {
         const rot = mapRotationDeg(p);
+        const tt = hasTrueTrack(p);
         return selfPilotDivIcon(rot, fill, {
-          hdg: fmtHdg(rot),
+          hdg: fmtTrkOrHdg(rot, tt),
           alt: fmtAlt(p.altitudeFt),
           spd: fmtGs(p.groundSpeedKt),
         });
@@ -365,8 +390,8 @@ export function FlightMap({
         Amber line = route; rings = waypoints.{" "}
         <span className="text-violet-300/90">You</span> = purple diamond + stats
         box; <span className="text-slate-400">others</span> show @name above;
-        hover them for HDG / ALT / GS (heading and ground speed from the bridge
-        when connected).
+        hover them for HDG / ALT / GS (nose heading and ground speed from the
+        bridge when connected; TRK only if a client sends ground track).
         {myPos ? (
           <>
             {" "}
